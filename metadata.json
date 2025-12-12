@@ -1,0 +1,7 @@
+{
+  "name": "PagaMiPana",
+  "description": "Divide la cuenta con estilo. Sube tu ticket, asigna gastos y paga a tus panas.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
