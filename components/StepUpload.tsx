@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Receipt, RefreshCw, Sparkles } from 'lucide-react';
+import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { Button } from './Button';
 
 interface StepUploadProps {
@@ -11,6 +11,7 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,16 +109,18 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
         </div>
       </div>
 
+      {/* Interactive Drop/Click Zone */}
       <div 
-        className="relative w-full max-w-sm p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4"
+        onClick={() => setShowOptions(true)}
+        className="relative w-full max-w-sm p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4 cursor-pointer hover:bg-white/40 active:scale-[0.98] group"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
       >
-         <div className="w-16 h-16 bg-white/50 rounded-full flex items-center justify-center mx-auto text-zinc-500">
+         <div className="w-16 h-16 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
             <Camera size={32} />
          </div>
          <p className="text-zinc-600 font-medium px-4 text-center">
-           Toma una foto o sube el ticket para empezar
+           Toca para subir el ticket
          </p>
       </div>
 
@@ -161,6 +164,45 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
           Subir desde galería
         </Button>
       </div>
+
+      {/* Action Sheet Modal */}
+      {showOptions && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
+            onClick={() => setShowOptions(false)}
+          />
+          <div className="relative w-full max-w-sm bg-transparent flex flex-col gap-2 animate-fade-in z-10">
+             <div className="bg-white/90 backdrop-blur-xl rounded-2xl overflow-hidden shadow-xl">
+                 <div className="py-3 text-center border-b border-zinc-200/50">
+                    <p className="text-xs font-semibold text-zinc-500">Selecciona una opción</p>
+                 </div>
+                 <button 
+                    onClick={() => { setShowOptions(false); cameraInputRef.current?.click(); }}
+                    className="w-full py-3.5 flex items-center justify-center gap-2 text-lg text-blue-600 active:bg-zinc-100 transition-colors border-b border-zinc-200/50"
+                 >
+                    <Camera size={20} />
+                    Hacer Foto
+                 </button>
+                 <button 
+                    onClick={() => { setShowOptions(false); galleryInputRef.current?.click(); }}
+                    className="w-full py-3.5 flex items-center justify-center gap-2 text-lg text-blue-600 active:bg-zinc-100 transition-colors"
+                 >
+                    <ImageIcon size={20} />
+                    Galería
+                 </button>
+             </div>
+             
+             <button 
+                onClick={() => setShowOptions(false)}
+                className="w-full py-3.5 bg-white rounded-2xl text-lg font-semibold text-blue-600 shadow-xl active:scale-[0.98] transition-all"
+            >
+                Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
