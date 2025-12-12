@@ -7,12 +7,17 @@ interface StepUploadProps {
 }
 
 export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // We need two refs for two different inputs behaviors
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) processFile(file);
+    
+    // Reset inputs so the same file can be selected again if needed
+    if (e.target) e.target.value = '';
   };
 
   const processFile = (file: File) => {
@@ -39,7 +44,8 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
 
   const handleRetake = () => {
     setPreviewUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
   // --- LAYOUT: PREVIEW MODE ---
@@ -116,11 +122,21 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
       </div>
 
       <div className="w-full max-w-sm space-y-3">
+        {/* Input explicitly for Camera */}
         <input
           type="file"
           accept="image/*"
           capture="environment"
-          ref={fileInputRef}
+          ref={cameraInputRef}
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        
+        {/* Input for Gallery (No capture attribute triggers standard picker) */}
+        <input
+          type="file"
+          accept="image/*"
+          ref={galleryInputRef}
           className="hidden"
           onChange={handleFileChange}
         />
@@ -129,7 +145,7 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
           fullWidth 
           variant="primary" 
           icon={<Camera size={20} />}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => cameraInputRef.current?.click()}
           className="h-14 text-base shadow-lg"
         >
           Hacer Foto
@@ -139,7 +155,7 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
           fullWidth 
           variant="outline" 
           icon={<Upload size={20} />}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => galleryInputRef.current?.click()}
           className="bg-white/50 border-white/50 backdrop-blur-md"
         >
           Subir desde galería
