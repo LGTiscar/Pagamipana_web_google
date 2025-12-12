@@ -34,8 +34,8 @@ export const StepPeople: React.FC<StepPeopleProps> = ({ people, setPeople, onNex
 
   return (
     <div className="flex flex-col h-full max-w-lg mx-auto w-full">
-      {/* Scrollable container including footer */}
-      <div className="flex-1 overflow-y-auto px-4 no-scrollbar flex flex-col">
+      {/* Scrollable container including footer. Added pb-20 to ensure bottom is reachable on mobile. */}
+      <div className="flex-1 overflow-y-auto px-4 no-scrollbar flex flex-col pb-20">
         <div className="mb-8 mt-2 shrink-0">
             <h2 className="text-3xl font-bold text-black tracking-tight">¿Quiénes participan?</h2>
             <p className="text-zinc-500 mt-1">Añade a los panas que van a compartir gastos.</p>
@@ -48,7 +48,7 @@ export const StepPeople: React.FC<StepPeopleProps> = ({ people, setPeople, onNex
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Nombre (ej: Ana)"
+              placeholder="Nombre"
               // Updated Styles: Semi-transparent grey background, no border, integrates with gradient
               className="flex-1 block w-full rounded-2xl bg-zinc-200/50 backdrop-blur-md text-zinc-900 shadow-inner sm:text-sm p-4 placeholder-zinc-500 outline-none focus:bg-white/60 focus:ring-2 focus:ring-black/5 transition-all"
               autoFocus
@@ -63,7 +63,7 @@ export const StepPeople: React.FC<StepPeopleProps> = ({ people, setPeople, onNex
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 flex-1">
+        <div className="grid grid-cols-1 gap-3 flex-1 min-h-0">
           {people.map((person) => (
             <div 
               key={person.id} 
@@ -93,7 +93,7 @@ export const StepPeople: React.FC<StepPeopleProps> = ({ people, setPeople, onNex
         </div>
 
         {/* Footer inline at the bottom */}
-        <div className="mt-8 mb-8 shrink-0">
+        <div className="mt-8 shrink-0">
           <Button 
             fullWidth 
             onClick={onNext} 

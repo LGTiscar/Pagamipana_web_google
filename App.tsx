@@ -66,9 +66,8 @@ export default function App() {
   };
 
   return (
-    // CHANGED: min-h-screen to h-screen to strictly constrain height
-    // This forces children with overflow-y-auto to actually scroll
-    <div className="h-screen flex flex-col font-sans overflow-hidden">
+    // Changed h-screen to h-[100dvh] to correctly handle mobile browser address bars
+    <div className="h-[100dvh] flex flex-col font-sans overflow-hidden">
       {/* Header / Navbar - Only visible after upload step to avoid duplicate branding */}
       {step !== AppStep.UPLOAD && (
         <header className="px-4 py-4 shrink-0 z-50 animate-fade-in">
@@ -87,7 +86,6 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      {/* CHANGED: overflow-hidden ensures inner components manage their own scroll */}
       <main className="flex-1 w-full max-w-3xl mx-auto relative overflow-hidden flex flex-col">
         
         {step === AppStep.PROCESSING && (
