@@ -61,19 +61,26 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     });
   };
 
+  // UPDATED: "Winner Takes All" Logic for Quick Assignment
   const toggleGroupBulkAssignment = (groupItems: SplitItem[], personId: string) => {
     setAssignments(prev => {
       const next = { ...prev };
-      const allAssigned = groupItems.every(item => (next[item.id] || []).includes(personId));
+      
+      // Check if this person ALREADY owns ALL items in the group exclusively
+      // (This allows toggle off behavior)
+      const isFullyOwnedByPerson = groupItems.every(item => {
+        const assigned = next[item.id] || [];
+        return assigned.length === 1 && assigned[0] === personId;
+      });
       
       groupItems.forEach(item => {
-        const currentAssigned = next[item.id] || [];
-        if (allAssigned) {
-          next[item.id] = currentAssigned.filter(id => id !== personId);
+        if (isFullyOwnedByPerson) {
+          // If they have it all, clear it (deselect)
+          next[item.id] = [];
         } else {
-          if (!currentAssigned.includes(personId)) {
-            next[item.id] = [...currentAssigned, personId];
-          }
+          // Otherwise, give them EVERYTHING (Exclusive assignment)
+          // This removes any other people previously assigned to these items
+          next[item.id] = [personId];
         }
       });
       return next;
@@ -234,17 +241,22 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                             <>
                                                 <div>
                                                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">
-                                                        Asignación rápida ({quantity} uds):
+                                                        Asignación rápida (Todo a uno):
                                                     </p>
                                                     <div className="flex flex-wrap gap-2">
                                                         {people.map(person => {
-                                                            const isAssignedToAll = group.every(i => (assignments[i.id] || []).includes(person.id));
+                                                            // Logic Update for UI: Check if person owns ALL items exclusively
+                                                            const isOwner = group.every(i => {
+                                                                const assigned = assignments[i.id] || [];
+                                                                return assigned.length === 1 && assigned[0] === person.id;
+                                                            });
+
                                                             return (
                                                                 <button
                                                                     key={person.id}
                                                                     onClick={() => toggleGroupBulkAssignment(group, person.id)}
                                                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all text-xs font-medium
-                                                                        ${isAssignedToAll 
+                                                                        ${isOwner 
                                                                             ? `bg-zinc-900 border-black text-white` 
                                                                             : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400'
                                                                         }`}
