@@ -5,8 +5,9 @@ import { StepAssign } from './components/StepAssign';
 import { StepResults } from './components/StepResults';
 import { parseReceiptImage } from './services/geminiService';
 import { AppStep, ReceiptItem, SplitItem, Person, Assignment, SyncPayload } from './types';
-import { Loader2, AlertCircle, Receipt } from 'lucide-react';
-import { joinRoom } from 'trystero';
+import { Loader2, AlertCircle, Receipt, ArrowRight } from 'lucide-react';
+import mqtt from 'mqtt';
+import { Button } from './components/Button';
 
 // Utility to flatten receipt items into assignable units
 const flattenItems = (items: ReceiptItem[]): SplitItem[] => {
@@ -28,6 +29,12 @@ const flattenItems = (items: ReceiptItem[]): SplitItem[] => {
   return flattened;
 };
 
+// --- MQTT CONFIGURATION ---
+// Using HiveMQ Public Broker (Secure WebSockets)
+// Alternative: 'wss://test.mosquitto.org:8081'
+const MQTT_BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
+const TOPIC_PREFIX = 'pagamipana/v1/session';
+
 export default function App() {
   const [step, setStep] = useState<AppStep>(AppStep.UPLOAD);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
@@ -42,9 +49,13 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [peerCount, setPeerCount] = useState(1); // Self is 1
-  const isRemoteUpdate = useRef(false);
+  const [showJoinInput, setShowJoinInput] = useState(false);
+  const [manualSessionCode, setManualSessionCode] = useState('');
   
-  // Refs to hold current state for P2P callbacks to avoid stale closures
+  const isRemoteUpdate = useRef(false);
+  const clientRef = useRef<mqtt.MqttClient | null>(null);
+  
+  // Refs to hold current state for callbacks to avoid stale closures
   const stateRef = useRef({
     step,
     splitItems,
@@ -57,112 +68,132 @@ export default function App() {
     stateRef.current = { step, splitItems, people, assignments };
   }, [step, splitItems, people, assignments]);
 
-  const sendPayloadRef = useRef<((data: SyncPayload, target?: string) => void) | null>(null);
+  // --- MQTT CONNECTION LOGIC ---
+  const initSession = (id: string) => {
+    setSessionId(id);
+    setIsSyncing(true);
 
-  // Initialize Session & P2P Room
-  useEffect(() => {
-    // 1. Get or Create Session ID
-    const params = new URLSearchParams(window.location.search);
-    const urlSession = params.get('session');
-    // If URL has session, use it, otherwise generate one
-    const currentSession = urlSession || Math.random().toString(36).substring(2, 9);
-    setSessionId(currentSession);
+    const topic = `${TOPIC_PREFIX}/${id}`;
+    
+    // Connect to MQTT Broker
+    const client = mqtt.connect(MQTT_BROKER_URL, {
+        clientId: `user-${Math.random().toString(16).substring(2, 8)}`,
+        keepalive: 60,
+        clean: true,
+        reconnectPeriod: 1000,
+    });
 
-    if (urlSession) {
-        setIsSyncing(true);
-    }
+    clientRef.current = client;
 
-    // 2. Connect to P2P Room (Trystero)
-    // We use a specific appId to namespace our app in the torrent swarm
-    const config = { appId: 'pagamipana_v1' };
-    const room = joinRoom(config, currentSession);
+    client.on('connect', () => {
+        console.log('Connected to MQTT Broker');
+        setIsSyncing(false);
+        client.subscribe(topic, (err) => {
+            if (!err) {
+                // Determine if we should announce ourselves
+                // We publish a "HELLO" message to ask for state or announce presence
+                const helloPayload: SyncPayload = { type: 'REQUEST_SYNC' };
+                client.publish(topic, JSON.stringify({ senderId: client.options.clientId, ...helloPayload }));
+            }
+        });
+    });
 
-    // Create action for syncing
-    const [sendPayload, getPayload] = room.makeAction<SyncPayload>('sync');
-    sendPayloadRef.current = sendPayload;
+    client.on('message', (receivedTopic, message) => {
+        if (receivedTopic !== topic) return;
 
-    // Handle Peers
-    room.onPeerJoin(peerId => {
-        setPeerCount(prev => prev + 1);
-        
-        // If I am a host (have items), I should welcome the new peer with the state
-        const currentState = stateRef.current;
-        if (currentState.splitItems.length > 0) {
-            console.log('Peer joined, sending state...');
-            sendPayload({
-                type: 'SYNC_STATE',
-                payload: {
-                    items: currentState.splitItems,
-                    people: currentState.people,
-                    assignments: currentState.assignments,
-                    step: currentState.step === AppStep.UPLOAD ? AppStep.PROCESSING : currentState.step
+        try {
+            const data = JSON.parse(message.toString());
+            // Ignore messages sent by ourselves
+            if (data.senderId === client.options.clientId) return;
+
+            const msg = data as SyncPayload;
+
+            if (msg.type === 'SYNC_STATE') {
+                console.log('Received State Sync');
+                isRemoteUpdate.current = true;
+                setSplitItems(msg.payload.items);
+                setPeople(msg.payload.people);
+                setAssignments(msg.payload.assignments);
+                setStep(msg.payload.step);
+                // Assume if we receive state, there is at least one other peer
+                setPeerCount(prev => Math.max(prev, 2));
+                setTimeout(() => isRemoteUpdate.current = false, 100);
+
+            } else if (msg.type === 'UPDATE_ASSIGNMENTS') {
+                isRemoteUpdate.current = true;
+                setAssignments(msg.payload);
+                setTimeout(() => isRemoteUpdate.current = false, 100);
+
+            } else if (msg.type === 'UPDATE_PEOPLE') {
+                 isRemoteUpdate.current = true;
+                 setPeople(msg.payload);
+                 setTimeout(() => isRemoteUpdate.current = false, 100);
+
+            } else if (msg.type === 'REQUEST_SYNC') {
+                // Someone joined or asked for state. If we have data, we are the "host".
+                setPeerCount(prev => prev + 1); // Bump peer count visually
+                const currentState = stateRef.current;
+                
+                if (currentState.splitItems.length > 0) {
+                     const response: SyncPayload = {
+                         type: 'SYNC_STATE',
+                         payload: {
+                             items: currentState.splitItems,
+                             people: currentState.people,
+                             assignments: currentState.assignments,
+                             step: currentState.step
+                         }
+                     };
+                     client.publish(topic, JSON.stringify({ senderId: client.options.clientId, ...response }));
                 }
-            }, peerId); // Send directly to the new peer
+            }
+        } catch (e) {
+            console.error('Error parsing MQTT message', e);
         }
     });
 
-    room.onPeerLeave(() => {
-        setPeerCount(prev => Math.max(1, prev - 1));
+    client.on('error', (err) => {
+        console.error('MQTT Error:', err);
     });
-
-    // Handle Incoming Data
-    getPayload((msg, peerId) => {
-        if (msg.type === 'SYNC_STATE') {
-            console.log('Received State Sync');
-            isRemoteUpdate.current = true;
-            setSplitItems(msg.payload.items);
-            setPeople(msg.payload.people);
-            setAssignments(msg.payload.assignments);
-            setStep(msg.payload.step);
-            setIsSyncing(false); 
-            setTimeout(() => isRemoteUpdate.current = false, 100);
-        } else if (msg.type === 'UPDATE_ASSIGNMENTS') {
-            isRemoteUpdate.current = true;
-            setAssignments(msg.payload);
-            setTimeout(() => isRemoteUpdate.current = false, 100);
-        } else if (msg.type === 'UPDATE_PEOPLE') {
-             isRemoteUpdate.current = true;
-             setPeople(msg.payload);
-             setTimeout(() => isRemoteUpdate.current = false, 100);
-        } else if (msg.type === 'REQUEST_SYNC') {
-            // Someone asked for sync explicitly
-            const currentState = stateRef.current;
-            if (currentState.splitItems.length > 0) {
-                 sendPayload({
-                     type: 'SYNC_STATE',
-                     payload: {
-                         items: currentState.splitItems,
-                         people: currentState.people,
-                         assignments: currentState.assignments,
-                         step: currentState.step
-                     }
-                 }, peerId);
-            }
-        }
-    });
-
-    // Explicitly ask for sync if we are a guest
-    if (urlSession) {
-        // Trystero needs a moment to connect. We can try broadcasting a request.
-        // But usually the host 'onPeerJoin' covers it.
-        // We add a fallback timeout just in case.
-        const timer = setTimeout(() => {
-            if (stateRef.current.splitItems.length === 0) {
-                 sendPayload({ type: 'REQUEST_SYNC' });
-            }
-        }, 2000);
-        return () => clearTimeout(timer);
-    }
 
     return () => {
-        room.leave();
+        if (client.connected) {
+            client.end();
+        }
     };
-  }, []); // Run once on mount
+  };
+
+  // Helper to publish messages
+  const broadcast = (payload: SyncPayload) => {
+      if (clientRef.current && clientRef.current.connected && sessionId) {
+          const topic = `${TOPIC_PREFIX}/${sessionId}`;
+          const message = JSON.stringify({ 
+              senderId: clientRef.current.options.clientId, 
+              ...payload 
+          });
+          clientRef.current.publish(topic, message);
+      }
+  };
+
+  // Initialize Session on Load if URL has param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlSession = params.get('session');
+    
+    if (urlSession) {
+        initSession(urlSession);
+    } else {
+        const newId = Math.random().toString(36).substring(2, 9);
+        setSessionId(newId);
+        // We initialize immediately so the "Invite" button works instantly if clicked later
+        initSession(newId);
+    }
+  }, []); 
 
   // Broadcast Assignments Changes
   useEffect(() => {
-    if (!isRemoteUpdate.current && sendPayloadRef.current && step === AppStep.ASSIGN) {
-        sendPayloadRef.current({
+    if (!isRemoteUpdate.current && step === AppStep.ASSIGN) {
+        broadcast({
             type: 'UPDATE_ASSIGNMENTS',
             payload: assignments
         });
@@ -171,8 +202,8 @@ export default function App() {
 
   // Broadcast People Changes
   useEffect(() => {
-    if (!isRemoteUpdate.current && sendPayloadRef.current && people.length > 0) {
-         sendPayloadRef.current({
+    if (!isRemoteUpdate.current && people.length > 0) {
+         broadcast({
             type: 'UPDATE_PEOPLE',
             payload: people
         });
@@ -191,6 +222,21 @@ export default function App() {
       setRawItems(items);
       setSplitItems(flattenItems(items));
       setStep(AppStep.PEOPLE);
+      
+      // Broadcast initial state once we have items
+      // We need to wait a tick for state to update or pass directly
+      setTimeout(() => {
+          broadcast({
+            type: 'SYNC_STATE',
+            payload: {
+                items: flattenItems(items),
+                people: [],
+                assignments: {},
+                step: AppStep.PEOPLE
+            }
+          });
+      }, 500);
+
     } catch (err) {
       console.error(err);
       setError("No pudimos leer el ticket. Inténtalo de nuevo con mejor iluminación o fondo oscuro.");
@@ -201,24 +247,48 @@ export default function App() {
   };
 
   const handleReset = () => {
-    // Clear URL param without reload
-    window.history.pushState({}, '', window.location.pathname);
-    // Gen new session
-    const newId = Math.random().toString(36).substring(2, 9);
-    setSessionId(newId);
-    setPeerCount(1);
-    
-    setStep(AppStep.UPLOAD);
-    setReceiptImage(null);
-    setPeople([]);
-    setAssignments({});
-    setSplitItems([]);
-    
-    // We would technically want to leave the old room and join a new one, 
-    // but a full page reload is often cleaner for "Reset" in P2P apps.
-    // For now, we just reset local state. The Room is still the old one until refresh.
-    window.location.reload(); 
+    window.location.href = window.location.origin + window.location.pathname;
   };
+
+  const handleManualJoin = () => {
+      if (!manualSessionCode.trim()) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set('session', manualSessionCode.trim());
+      window.location.href = url.toString();
+  };
+
+  if (showJoinInput) {
+      return (
+        <div className="h-[100dvh] flex flex-col items-center justify-center font-sans px-6 bg-zinc-50 relative">
+             <button 
+                onClick={() => setShowJoinInput(false)}
+                className="absolute top-6 left-6 text-sm text-zinc-500 hover:text-black font-medium"
+             >
+                 ← Volver
+             </button>
+             
+             <div className="w-full max-w-sm">
+                 <div className="mb-6 text-center">
+                    <h2 className="text-2xl font-bold text-black mb-2">Unirse a una sesión</h2>
+                    <p className="text-zinc-500">Pide el código corto a tu amigo (ej: 6bqwdvq)</p>
+                 </div>
+                 
+                 <input 
+                    type="text"
+                    value={manualSessionCode}
+                    onChange={(e) => setManualSessionCode(e.target.value)}
+                    placeholder="Introduce el código aquí"
+                    className="w-full p-4 rounded-2xl bg-white border border-zinc-200 text-center text-2xl font-mono tracking-widest uppercase mb-4 focus:ring-2 focus:ring-black outline-none"
+                    autoFocus
+                 />
+                 
+                 <Button fullWidth onClick={handleManualJoin} disabled={!manualSessionCode.trim()}>
+                     Entrar <ArrowRight className="ml-2" size={18} />
+                 </Button>
+             </div>
+        </div>
+      );
+  }
 
   if (isSyncing) {
       return (
@@ -227,9 +297,9 @@ export default function App() {
                 <div className="absolute inset-0 bg-black blur-xl opacity-10 rounded-full"></div>
                 <Loader2 className="w-12 h-12 text-black animate-spin relative z-10" />
             </div>
-            <h2 className="text-xl font-bold mb-2">Buscando sesión...</h2>
+            <h2 className="text-xl font-bold mb-2">Conectando...</h2>
             <p className="text-sm text-zinc-500 max-w-xs">
-                Conectando con el anfitrión mediante P2P seguro. Esto puede tardar unos segundos.
+                Estableciendo conexión segura con la sesión {sessionId}...
             </p>
         </div>
       );
@@ -279,7 +349,10 @@ export default function App() {
         )}
 
         {step === AppStep.UPLOAD && (
-          <StepUpload onImageSelected={handleImageSelected} />
+          <StepUpload 
+            onImageSelected={handleImageSelected} 
+            onJoinSession={() => setShowJoinInput(true)}
+          />
         )}
 
         {step === AppStep.PEOPLE && (

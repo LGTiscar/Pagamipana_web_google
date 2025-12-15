@@ -1,12 +1,13 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon, Users } from 'lucide-react';
 import { Button } from './Button';
 
 interface StepUploadProps {
   onImageSelected: (base64: string) => void;
+  onJoinSession: () => void;
 }
 
-export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
+export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinSession }) => {
   // We need two refs for two different inputs behaviors
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -162,6 +163,16 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected }) => {
           className="bg-white/50 border-white/50 backdrop-blur-md"
         >
           Subir desde galería
+        </Button>
+
+        <Button 
+          fullWidth 
+          variant="ghost" 
+          icon={<Users size={20} />}
+          onClick={onJoinSession}
+          className="text-zinc-600 hover:bg-zinc-100/50 mt-2"
+        >
+          Unirse a sesión existente
         </Button>
       </div>
 
