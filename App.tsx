@@ -31,7 +31,6 @@ const flattenItems = (items: ReceiptItem[]): SplitItem[] => {
 
 // --- MQTT CONFIGURATION ---
 // Using HiveMQ Public Broker (Secure WebSockets)
-// Alternative: 'wss://test.mosquitto.org:8081'
 const MQTT_BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
 const TOPIC_PREFIX = 'pagamipana/v1/session';
 
@@ -80,7 +79,7 @@ export default function App() {
         clientId: `user-${Math.random().toString(16).substring(2, 8)}`,
         keepalive: 60,
         clean: true,
-        reconnectPeriod: 1000,
+        reconnectPeriod: 2000,
     });
 
     clientRef.current = client;
@@ -90,8 +89,7 @@ export default function App() {
         setIsSyncing(false);
         client.subscribe(topic, (err) => {
             if (!err) {
-                // Determine if we should announce ourselves
-                // We publish a "HELLO" message to ask for state or announce presence
+                // Request current state from other peers
                 const helloPayload: SyncPayload = { type: 'REQUEST_SYNC' };
                 client.publish(topic, JSON.stringify({ senderId: client.options.clientId, ...helloPayload }));
             }
@@ -130,8 +128,8 @@ export default function App() {
                  setTimeout(() => isRemoteUpdate.current = false, 100);
 
             } else if (msg.type === 'REQUEST_SYNC') {
-                // Someone joined or asked for state. If we have data, we are the "host".
-                setPeerCount(prev => prev + 1); // Bump peer count visually
+                // Someone joined. If we have meaningful data (items), we act as host and send state.
+                setPeerCount(prev => prev + 1); 
                 const currentState = stateRef.current;
                 
                 if (currentState.splitItems.length > 0) {
@@ -185,7 +183,6 @@ export default function App() {
     } else {
         const newId = Math.random().toString(36).substring(2, 9);
         setSessionId(newId);
-        // We initialize immediately so the "Invite" button works instantly if clicked later
         initSession(newId);
     }
   }, []); 
@@ -224,7 +221,6 @@ export default function App() {
       setStep(AppStep.PEOPLE);
       
       // Broadcast initial state once we have items
-      // We need to wait a tick for state to update or pass directly
       setTimeout(() => {
           broadcast({
             type: 'SYNC_STATE',
