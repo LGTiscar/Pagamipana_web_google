@@ -36,6 +36,29 @@ export enum AppStep {
   RESULTS = 'RESULTS',
 }
 
+// Sync types for BroadcastChannel
+export type SyncPayload = 
+  | {
+      type: 'SYNC_STATE';
+      payload: {
+        items: SplitItem[];
+        people: Person[];
+        assignments: Assignment;
+        step: AppStep;
+      };
+    } 
+  | {
+      type: 'UPDATE_ASSIGNMENTS';
+      payload: Assignment;
+    } 
+  | {
+      type: 'UPDATE_PEOPLE';
+      payload: Person[];
+    } 
+  | {
+      type: 'REQUEST_SYNC';
+    };
+
 // Custom pastel palette from user request
 // All backgrounds are light, so we use dark text (zinc-900) for contrast
 export const AVATAR_COLORS = [

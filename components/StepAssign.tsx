@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Check, Users, ChevronDown, ChevronUp, Plus, Minus, List, Layers } from 'lucide-react';
+import { Check, Users, ChevronDown, ChevronUp, Plus, Minus, List, Layers, UserPlus, Link as LinkIcon, CheckCircle, Share } from 'lucide-react';
 import { Button } from './Button';
 import { SplitItem, Person, Assignment } from '../types';
 
@@ -9,6 +9,8 @@ interface StepAssignProps {
   assignments: Assignment;
   setAssignments: React.Dispatch<React.SetStateAction<Assignment>>;
   onNext: () => void;
+  sessionId: string;
+  peerCount: number;
 }
 
 export const StepAssign: React.FC<StepAssignProps> = ({ 
@@ -16,11 +18,14 @@ export const StepAssign: React.FC<StepAssignProps> = ({
   people, 
   assignments, 
   setAssignments, 
-  onNext 
+  onNext,
+  sessionId,
+  peerCount
 }) => {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [detailedMode, setDetailedMode] = useState(false);
   const [expandedSubItem, setExpandedSubItem] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const handleGroupToggle = (groupId: string) => {
     if (expandedGroup === groupId) {
@@ -29,6 +34,31 @@ export const StepAssign: React.FC<StepAssignProps> = ({
         setExpandedGroup(groupId);
         setDetailedMode(false); 
         setExpandedSubItem(null);
+    }
+  };
+
+  const handleInvite = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+    
+    // Use native sharing if available (Mobile phones mostly)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'PagaMiPana',
+          text: '¡Entra a dividir la cuenta conmigo!',
+          url: url,
+        });
+        // Don't show "Copied" state if share sheet was opened, as feedback is handled by OS
+      } catch (err) {
+        // Fallback if user cancels or error occurs
+        console.log('Share dismissed', err);
+      }
+    } else {
+      // Fallback for Desktop: Copy to clipboard
+      navigator.clipboard.writeText(url).then(() => {
+          setCopiedLink(true);
+          setTimeout(() => setCopiedLink(false), 2000);
+      });
     }
   };
 
@@ -123,13 +153,28 @@ export const StepAssign: React.FC<StepAssignProps> = ({
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto w-full relative">
-      {/* Header - Sticky Progress Bar */}
+      {/* Header - Sticky Progress Bar & Invite */}
       <div className="bg-white/90 backdrop-blur-md border-b border-zinc-100 sticky top-0 z-10 pb-4 pt-2 shadow-sm shrink-0">
-        <div className="flex justify-between items-end mb-3 px-4">
+        <div className="flex justify-between items-center mb-3 px-4">
             <h2 className="text-xl font-bold text-black tracking-tight">Asignar gastos</h2>
-            <span className="text-sm font-semibold text-zinc-500">
-                {Math.round(progress)}%
-            </span>
+            
+            <div className="flex items-center gap-2">
+               {peerCount > 1 && (
+                 <span className="flex items-center text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                    {peerCount} online
+                 </span>
+               )}
+               <button 
+                  onClick={handleInvite}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border
+                    ${copiedLink ? 'bg-green-100 text-green-700 border-green-200' : 'bg-black text-white border-black active:scale-95 shadow-sm'}
+                  `}
+               >
+                   {copiedLink ? <CheckCircle size={14} /> : <Share size={14} />}
+                   {copiedLink ? 'Copiado!' : 'Invitar'}
+               </button>
+            </div>
         </div>
         <div className="w-full bg-zinc-100 h-1.5">
             <div 
