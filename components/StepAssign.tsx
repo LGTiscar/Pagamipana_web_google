@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Check, Users, ChevronDown, ChevronUp, Plus, Minus, List, Layers, UserPlus, Link as LinkIcon, CheckCircle } from 'lucide-react';
+import { Check, Users, ChevronDown, ChevronUp, Plus, Minus, List, Layers, UserPlus, Link as LinkIcon, CheckCircle, Share } from 'lucide-react';
 import { Button } from './Button';
 import { SplitItem, Person, Assignment } from '../types';
 
@@ -37,12 +37,29 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     }
   };
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
-    navigator.clipboard.writeText(url).then(() => {
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2000);
-    });
+    
+    // Use native sharing if available (Mobile phones mostly)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'PagaMiPana',
+          text: '¡Entra a dividir la cuenta conmigo!',
+          url: url,
+        });
+        // Don't show "Copied" state if share sheet was opened, as feedback is handled by OS
+      } catch (err) {
+        // Fallback if user cancels or error occurs
+        console.log('Share dismissed', err);
+      }
+    } else {
+      // Fallback for Desktop: Copy to clipboard
+      navigator.clipboard.writeText(url).then(() => {
+          setCopiedLink(true);
+          setTimeout(() => setCopiedLink(false), 2000);
+      });
+    }
   };
 
   const groupedItems = useMemo(() => {
@@ -154,7 +171,7 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                     ${copiedLink ? 'bg-green-100 text-green-700 border-green-200' : 'bg-black text-white border-black active:scale-95 shadow-sm'}
                   `}
                >
-                   {copiedLink ? <CheckCircle size={14} /> : <UserPlus size={14} />}
+                   {copiedLink ? <CheckCircle size={14} /> : <Share size={14} />}
                    {copiedLink ? 'Copiado!' : 'Invitar'}
                </button>
             </div>
