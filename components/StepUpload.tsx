@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle, Share2 } from 'lucide-react';
+import { Camera, Upload, RefreshCw, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle, Share2 } from 'lucide-react';
 import { Button } from './Button';
+import { Logo } from './Logo';
 
 interface StepUploadProps {
   onImageSelected: (base64: string) => void;
@@ -135,8 +136,8 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
       {/* Main Content Wrapper for Centering */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-8 min-h-[400px]">
           <div className="text-center space-y-3">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-black text-white shadow-2xl mb-2">
-                <Receipt size={40} strokeWidth={1.5} />
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-black text-white shadow-2xl mb-2">
+                <Logo size={56} strokeWidth={1.5} />
             </div>
             <div>
                 <h2 className="text-4xl font-bold text-black tracking-tight mb-2">PagaMiPana</h2>

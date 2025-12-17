@@ -5,7 +5,8 @@ import { StepAssign } from './components/StepAssign';
 import { StepResults } from './components/StepResults';
 import { parseReceiptImage } from './services/geminiService';
 import { AppStep, ReceiptItem, SplitItem, Person, Assignment, SyncPayload } from './types';
-import { Loader2, AlertCircle, Receipt, ArrowRight, Hash, ChevronLeft } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowRight, Hash, ChevronLeft } from 'lucide-react';
+import { Logo } from './components/Logo';
 import mqtt from 'mqtt';
 import { Button } from './components/Button';
 
@@ -382,7 +383,7 @@ export default function App() {
               {!stepInfo && (
                   <div className="flex items-center gap-2">
                      <div className="bg-black text-white rounded-xl p-1.5 shadow-lg shadow-black/20">
-                        <Receipt size={16} strokeWidth={2} />
+                        <Logo size={16} strokeWidth={2} />
                     </div>
                     <span className="font-bold text-zinc-900">PagaMiPana</span>
                   </div>
