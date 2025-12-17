@@ -1,18 +1,20 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon, Users } from 'lucide-react';
+import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle } from 'lucide-react';
 import { Button } from './Button';
 
 interface StepUploadProps {
   onImageSelected: (base64: string) => void;
   onJoinSession: () => void;
+  sessionId: string;
 }
 
-export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinSession }) => {
+export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinSession, sessionId }) => {
   // We need two refs for two different inputs behaviors
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,6 +50,13 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
     setPreviewUrl(null);
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (galleryInputRef.current) galleryInputRef.current.value = '';
+  };
+
+  const copySessionId = () => {
+      navigator.clipboard.writeText(sessionId).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+      });
   };
 
   // --- LAYOUT: PREVIEW MODE ---
@@ -99,81 +108,103 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
   // --- LAYOUT: INITIAL UPLOAD MODE ---
   return (
     // Added pt-16 to ensure content clears the device notch
-    <div className="flex flex-col items-center justify-center h-full space-y-8 animate-fade-in px-4 pb-12 pt-16">
-      <div className="text-center space-y-3">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-black text-white shadow-2xl mb-2">
-            <Receipt size={40} strokeWidth={1.5} />
-        </div>
-        <div>
-            <h2 className="text-4xl font-bold text-black tracking-tight mb-2">PagaMiPana</h2>
-            <p className="text-zinc-600 text-lg font-medium">Deja que la IA haga el trabajo sucio</p>
-        </div>
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar animate-fade-in px-4 pt-16 pb-8">
+      
+      {/* Main Content Wrapper for Centering */}
+      <div className="flex-1 flex flex-col items-center justify-center space-y-8 min-h-[400px]">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-black text-white shadow-2xl mb-2">
+                <Receipt size={40} strokeWidth={1.5} />
+            </div>
+            <div>
+                <h2 className="text-4xl font-bold text-black tracking-tight mb-2">PagaMiPana</h2>
+                <p className="text-zinc-600 text-lg font-medium">Deja que la IA haga el trabajo sucio</p>
+            </div>
+          </div>
+
+          {/* Interactive Drop/Click Zone */}
+          <div 
+            onClick={() => setShowOptions(true)}
+            className="relative w-full max-w-sm p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4 cursor-pointer hover:bg-white/40 active:scale-[0.98] group"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <div className="w-16 h-16 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
+                <Camera size={32} />
+            </div>
+            <p className="text-zinc-600 font-medium px-4 text-center">
+            Toca para subir el ticket
+            </p>
+          </div>
+
+          <div className="w-full max-w-sm space-y-3">
+            {/* Input explicitly for Camera */}
+            <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            ref={cameraInputRef}
+            className="hidden"
+            onChange={handleFileChange}
+            />
+            
+            {/* Input for Gallery (No capture attribute triggers standard picker) */}
+            <input
+            type="file"
+            accept="image/*"
+            ref={galleryInputRef}
+            className="hidden"
+            onChange={handleFileChange}
+            />
+            
+            <Button 
+            fullWidth 
+            variant="primary" 
+            icon={<Camera size={20} />}
+            onClick={() => cameraInputRef.current?.click()}
+            className="h-14 text-base shadow-lg"
+            >
+            Hacer Foto
+            </Button>
+            
+            <Button 
+            fullWidth 
+            variant="outline" 
+            icon={<Upload size={20} />}
+            onClick={() => galleryInputRef.current?.click()}
+            className="bg-white/50 border-white/50 backdrop-blur-md"
+            >
+            Subir desde galería
+            </Button>
+
+            <Button 
+            fullWidth 
+            variant="ghost" 
+            icon={<Users size={20} />}
+            onClick={onJoinSession}
+            className="text-zinc-600 hover:bg-zinc-100/50 mt-2"
+            >
+            Unirse a sesión existente
+            </Button>
+          </div>
       </div>
 
-      {/* Interactive Drop/Click Zone */}
-      <div 
-        onClick={() => setShowOptions(true)}
-        className="relative w-full max-w-sm p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4 cursor-pointer hover:bg-white/40 active:scale-[0.98] group"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-         <div className="w-16 h-16 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
-            <Camera size={32} />
-         </div>
-         <p className="text-zinc-600 font-medium px-4 text-center">
-           Toca para subir el ticket
-         </p>
-      </div>
-
-      <div className="w-full max-w-sm space-y-3">
-        {/* Input explicitly for Camera */}
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          ref={cameraInputRef}
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        
-        {/* Input for Gallery (No capture attribute triggers standard picker) */}
-        <input
-          type="file"
-          accept="image/*"
-          ref={galleryInputRef}
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        
-        <Button 
-          fullWidth 
-          variant="primary" 
-          icon={<Camera size={20} />}
-          onClick={() => cameraInputRef.current?.click()}
-          className="h-14 text-base shadow-lg"
-        >
-          Hacer Foto
-        </Button>
-        
-        <Button 
-          fullWidth 
-          variant="outline" 
-          icon={<Upload size={20} />}
-          onClick={() => galleryInputRef.current?.click()}
-          className="bg-white/50 border-white/50 backdrop-blur-md"
-        >
-          Subir desde galería
-        </Button>
-
-        <Button 
-          fullWidth 
-          variant="ghost" 
-          icon={<Users size={20} />}
-          onClick={onJoinSession}
-          className="text-zinc-600 hover:bg-zinc-100/50 mt-2"
-        >
-          Unirse a sesión existente
-        </Button>
+      {/* Session ID Footer Display */}
+      <div className="w-full max-w-sm mx-auto mt-8 shrink-0">
+          <div className="text-center bg-white/40 backdrop-blur-sm border border-zinc-200/50 rounded-2xl p-4 shadow-sm">
+             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Tu código de sesión</p>
+             <button 
+                onClick={copySessionId}
+                className="inline-flex items-center gap-2 group active:scale-95 transition-transform"
+             >
+                 <span className="text-2xl font-mono font-bold text-zinc-800 tracking-widest">{sessionId}</span>
+                 {copied ? (
+                     <CheckCircle size={16} className="text-green-500" />
+                 ) : (
+                     <Copy size={16} className="text-zinc-400 group-hover:text-black transition-colors" />
+                 )}
+             </button>
+          </div>
       </div>
 
       {/* Action Sheet Modal */}

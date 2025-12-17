@@ -5,7 +5,7 @@ import { StepAssign } from './components/StepAssign';
 import { StepResults } from './components/StepResults';
 import { parseReceiptImage } from './services/geminiService';
 import { AppStep, ReceiptItem, SplitItem, Person, Assignment, SyncPayload } from './types';
-import { Loader2, AlertCircle, Receipt, ArrowRight } from 'lucide-react';
+import { Loader2, AlertCircle, Receipt, ArrowRight, Hash } from 'lucide-react';
 import mqtt from 'mqtt';
 import { Button } from './components/Button';
 
@@ -243,7 +243,24 @@ export default function App() {
   };
 
   const handleReset = () => {
-    window.location.href = window.location.origin + window.location.pathname;
+    // 1. Gracefully disconnect existing session
+    if (clientRef.current) {
+        try {
+            clientRef.current.end(true);
+        } catch (e) {
+            console.error("Error disconnecting", e);
+        }
+    }
+
+    // 2. Generate a brand new session ID immediately
+    const newId = Math.random().toString(36).substring(2, 9);
+    
+    // 3. Construct new URL. We use 'assign' to force a navigation event, 
+    // ensuring the browser treats it as a fresh load with the new parameters.
+    const url = new URL(window.location.href);
+    url.searchParams.set('session', newId);
+    
+    window.location.assign(url.toString());
   };
 
   const handleManualJoin = () => {
@@ -314,9 +331,23 @@ export default function App() {
               </div>
               <h1 className="text-lg font-bold text-zinc-900 tracking-tight drop-shadow-sm">PagaMiPana</h1>
             </div>
-            <button onClick={handleReset} className="text-xs font-semibold text-zinc-500 hover:text-red-600 transition-colors bg-white/50 px-3 py-1.5 rounded-full border border-zinc-200">
-               Salir
-            </button>
+            
+            <div className="flex items-center gap-3">
+               {/* Display Session ID in Header */}
+               <div className="hidden sm:flex flex-col items-end mr-2">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Código</span>
+                    <span className="font-mono text-sm font-bold text-zinc-900 leading-none">{sessionId}</span>
+               </div>
+               {/* Mobile Session Badge */}
+               <div className="sm:hidden bg-white/60 backdrop-blur-sm px-2 py-1 rounded-md border border-zinc-200 shadow-sm flex items-center gap-1">
+                    <Hash size={10} className="text-zinc-400" />
+                    <span className="font-mono text-xs font-bold text-zinc-700">{sessionId}</span>
+               </div>
+
+               <button onClick={handleReset} className="text-xs font-semibold text-zinc-500 hover:text-red-600 transition-colors bg-white/50 px-3 py-1.5 rounded-full border border-zinc-200">
+                  Salir
+               </button>
+            </div>
           </div>
         </header>
       )}
@@ -348,6 +379,7 @@ export default function App() {
           <StepUpload 
             onImageSelected={handleImageSelected} 
             onJoinSession={() => setShowJoinInput(true)}
+            sessionId={sessionId}
           />
         )}
 
