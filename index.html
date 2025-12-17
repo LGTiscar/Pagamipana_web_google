@@ -7,9 +7,14 @@
     
     <!-- PWA / App Icon Configuration -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#ffffff" />
+    
+    <!-- iOS Specific Configuration -->
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="PagaMiPana" />
     
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -17,6 +22,8 @@
       
       body {
         font-family: 'Inter', sans-serif;
+        /* Prevent bounce scroll on iOS when in standalone mode */
+        overscroll-behavior-y: none;
       }
 
       /* Custom scrollbar for better mobile feel in lists */
