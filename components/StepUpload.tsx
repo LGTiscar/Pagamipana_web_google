@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle } from 'lucide-react';
+import { Camera, Upload, Receipt, RefreshCw, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle, Share2 } from 'lucide-react';
 import { Button } from './Button';
 
 interface StepUploadProps {
@@ -15,6 +15,7 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,6 +58,27 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
       });
+  };
+
+  const handleInvite = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'PagaMiPana',
+          text: '¡Entra a dividir la cuenta conmigo!',
+          url: url,
+        });
+      } catch (err) {
+        // ignore share dismissal
+      }
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+          setLinkCopied(true);
+          setTimeout(() => setLinkCopied(false), 2000);
+      });
+    }
   };
 
   // --- LAYOUT: PREVIEW MODE ---
@@ -190,19 +212,35 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
       </div>
 
       {/* Session ID Footer Display */}
-      <div className="w-full max-w-sm mx-auto mt-8 shrink-0">
-          <div className="text-center bg-white/40 backdrop-blur-sm border border-zinc-200/50 rounded-2xl p-4 shadow-sm">
-             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Tu código de sesión</p>
+      <div className="w-full max-w-sm mx-auto mt-8 shrink-0 px-1">
+          <div className="bg-white/60 backdrop-blur-md border border-zinc-200/50 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-4">
+             <div className="flex-1 min-w-0">
+                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Tu Sesión</p>
+                 <button 
+                    onClick={copySessionId}
+                    className="flex items-center gap-2 group active:scale-95 transition-transform"
+                 >
+                     <span className="text-2xl font-mono font-bold text-zinc-800 tracking-widest truncate">{sessionId}</span>
+                     {copied ? (
+                         <CheckCircle size={16} className="text-green-500 shrink-0" />
+                     ) : (
+                         <Copy size={16} className="text-zinc-300 group-hover:text-black transition-colors shrink-0" />
+                     )}
+                 </button>
+             </div>
+             
              <button 
-                onClick={copySessionId}
-                className="inline-flex items-center gap-2 group active:scale-95 transition-transform"
+                onClick={handleInvite}
+                className={`
+                    px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition-all flex items-center gap-2 shrink-0
+                    ${linkCopied 
+                        ? 'bg-green-100 text-green-700 shadow-green-100' 
+                        : 'bg-black text-white shadow-black/10 hover:bg-zinc-800'
+                    }
+                `}
              >
-                 <span className="text-2xl font-mono font-bold text-zinc-800 tracking-widest">{sessionId}</span>
-                 {copied ? (
-                     <CheckCircle size={16} className="text-green-500" />
-                 ) : (
-                     <Copy size={16} className="text-zinc-400 group-hover:text-black transition-colors" />
-                 )}
+                {linkCopied ? <CheckCircle size={16} /> : <Share2 size={16} />}
+                {linkCopied ? 'Copiado' : 'Invitar'}
              </button>
           </div>
       </div>

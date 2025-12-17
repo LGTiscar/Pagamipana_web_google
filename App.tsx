@@ -5,7 +5,7 @@ import { StepAssign } from './components/StepAssign';
 import { StepResults } from './components/StepResults';
 import { parseReceiptImage } from './services/geminiService';
 import { AppStep, ReceiptItem, SplitItem, Person, Assignment, SyncPayload } from './types';
-import { Loader2, AlertCircle, Receipt, ArrowRight, Hash } from 'lucide-react';
+import { Loader2, AlertCircle, Receipt, ArrowRight, Hash, ChevronLeft } from 'lucide-react';
 import mqtt from 'mqtt';
 import { Button } from './components/Button';
 
@@ -173,6 +173,9 @@ export default function App() {
       }
   };
 
+  // Helper to generate 5 digit code
+  const generateCode = () => Math.floor(10000 + Math.random() * 90000).toString();
+
   // Initialize Session on Load if URL has param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -181,7 +184,7 @@ export default function App() {
     if (urlSession) {
         initSession(urlSession);
     } else {
-        const newId = Math.random().toString(36).substring(2, 9);
+        const newId = generateCode();
         setSessionId(newId);
         initSession(newId);
     }
@@ -242,33 +245,64 @@ export default function App() {
     }
   };
 
-  const handleReset = () => {
-    // 1. Gracefully disconnect existing session
+  // Function to switch session without page reload
+  const switchSession = (newId: string) => {
+    // 1. Disconnect previous session
     if (clientRef.current) {
-        try {
-            clientRef.current.end(true);
-        } catch (e) {
-            console.error("Error disconnecting", e);
-        }
+        try { clientRef.current.end(true); } catch (e) { console.error(e); }
+        clientRef.current = null;
     }
 
-    // 2. Generate a brand new session ID immediately
-    const newId = Math.random().toString(36).substring(2, 9);
-    
-    // 3. Construct new URL. We use 'assign' to force a navigation event, 
-    // ensuring the browser treats it as a fresh load with the new parameters.
+    // 2. Update URL without triggering restricted navigation
     const url = new URL(window.location.href);
     url.searchParams.set('session', newId);
-    
-    window.location.assign(url.toString());
+    window.history.pushState({}, '', url.toString());
+
+    // 3. Reset Local State completely
+    setSessionId(newId);
+    setStep(AppStep.UPLOAD);
+    setReceiptImage(null);
+    setRawItems([]);
+    setSplitItems([]);
+    setPeople([]);
+    setAssignments({});
+    setLoading(false);
+    setError(null);
+    setPeerCount(1);
+    setShowJoinInput(false);
+    setManualSessionCode('');
+    isRemoteUpdate.current = false;
+
+    // 4. Initialize new session connection
+    initSession(newId);
+  };
+
+  const handleReset = () => {
+    const newId = generateCode();
+    switchSession(newId);
   };
 
   const handleManualJoin = () => {
       if (!manualSessionCode.trim()) return;
-      const url = new URL(window.location.href);
-      url.searchParams.set('session', manualSessionCode.trim());
-      window.location.href = url.toString();
+      switchSession(manualSessionCode.trim());
   };
+
+  const handleBack = () => {
+      if (step === AppStep.PEOPLE) setStep(AppStep.UPLOAD);
+      if (step === AppStep.ASSIGN) setStep(AppStep.PEOPLE);
+      if (step === AppStep.RESULTS) setStep(AppStep.ASSIGN);
+  };
+
+  // Helper logic for Step Header
+  const getStepInfo = () => {
+      switch(step) {
+          case AppStep.PEOPLE: return { title: 'Participantes', current: 1, total: 3 };
+          case AppStep.ASSIGN: return { title: 'Asignar', current: 2, total: 3 };
+          case AppStep.RESULTS: return { title: 'Resultados', current: 3, total: 3 };
+          default: return null;
+      }
+  };
+  const stepInfo = getStepInfo();
 
   if (showJoinInput) {
       return (
@@ -283,14 +317,14 @@ export default function App() {
              <div className="w-full max-w-sm">
                  <div className="mb-6 text-center">
                     <h2 className="text-2xl font-bold text-black mb-2">Unirse a una sesión</h2>
-                    <p className="text-zinc-500">Pide el código corto a tu amigo (ej: 6bqwdvq)</p>
+                    <p className="text-zinc-500">Introduce el código numérico de 5 dígitos</p>
                  </div>
                  
                  <input 
-                    type="text"
+                    type="number"
                     value={manualSessionCode}
                     onChange={(e) => setManualSessionCode(e.target.value)}
-                    placeholder="Introduce el código aquí"
+                    placeholder="Ej: 84921"
                     className="w-full p-4 rounded-2xl bg-white border border-zinc-200 text-center text-2xl font-mono tracking-widest uppercase mb-4 focus:ring-2 focus:ring-black outline-none"
                     autoFocus
                  />
@@ -323,13 +357,36 @@ export default function App() {
     <div className="h-[100dvh] flex flex-col font-sans overflow-hidden">
       {/* Header / Navbar - Only visible after upload step to avoid duplicate branding */}
       {step !== AppStep.UPLOAD && (
-        <header className="px-4 py-4 shrink-0 z-50 animate-fade-in">
+        <header className="px-4 py-4 shrink-0 z-50 animate-fade-in bg-white/50 backdrop-blur-md border-b border-white/50">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="bg-black text-white rounded-xl p-1.5 shadow-lg shadow-black/20">
-                  <Receipt size={20} strokeWidth={2} />
-              </div>
-              <h1 className="text-lg font-bold text-zinc-900 tracking-tight drop-shadow-sm">PagaMiPana</h1>
+            <div className="flex items-center gap-2">
+              {/* Logic: If in steps, show Back arrow + Step Info. If not (shouldn't happen here due to outer condition), show Logo */}
+              <button 
+                onClick={handleBack}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 hover:text-black hover:border-zinc-300 transition-all active:scale-95 shadow-sm"
+              >
+                  <ChevronLeft size={20} />
+              </button>
+              
+              {stepInfo && (
+                  <div className="flex flex-col ml-1">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider leading-none">
+                          Paso {stepInfo.current} de {stepInfo.total}
+                      </span>
+                      <span className="text-sm font-bold text-zinc-900 leading-tight">
+                          {stepInfo.title}
+                      </span>
+                  </div>
+              )}
+
+              {!stepInfo && (
+                  <div className="flex items-center gap-2">
+                     <div className="bg-black text-white rounded-xl p-1.5 shadow-lg shadow-black/20">
+                        <Receipt size={16} strokeWidth={2} />
+                    </div>
+                    <span className="font-bold text-zinc-900">PagaMiPana</span>
+                  </div>
+              )}
             </div>
             
             <div className="flex items-center gap-3">
