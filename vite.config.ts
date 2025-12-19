@@ -1,17 +1,15 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
-  plugins: [react()],
-  // Ya no definimos process.env.API_KEY aquí para el frontend.
-  // El frontend ahora llama a /api/parse-receipt que es donde vivirá la clave.
-  server: {
-    proxy: {
-      // Configuración para desarrollo local: redirige las llamadas a /api al servidor de funciones
-      '/api': {
-        target: 'http://localhost:3001', // O el puerto donde corras tus funciones locales
-        changeOrigin: true,
-      }
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  const env = loadEnv(mode, '.', '');
+  
+  return {
+    plugins: [react()],
+    define: {
+      // Prioritize process.env (Netlify system vars) over .env files
+      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY)
     }
-  }
+  };
 });

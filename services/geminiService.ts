@@ -1,39 +1,60 @@
+import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptItem } from "../types";
 
-export const parseReceiptImage = async (base64Image: string): Promise<ReceiptItem[]> => {
-  // Creamos un controlador para poder cancelar la petición si tarda demasiado
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 segundos de margen
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+export const parseReceiptImage = async (base64Image: string): Promise<ReceiptItem[]> => {
   try {
-    const response = await fetch('/api/parse-receipt', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Remove header if present (data:image/jpeg;base64,)
+    const cleanBase64 = base64Image.split(',')[1] || base64Image;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: cleanBase64,
+            },
+          },
+          {
+            text: `Analiza esta imagen de un ticket de restaurante. 
+            Extrae cada línea de producto.
+            Si un item tiene cantidad mayor a 1 (ej: "2x Cerveza"), devuélvelo como un solo item con quantity 2.
+            Ignora subtotales, totales, impuestos o propinas, solo quiero los items consumibles.
+            Devuelve un JSON estricto.`,
+          },
+        ],
       },
-      body: JSON.stringify({ image: base64Image }),
-      signal: controller.signal
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  description: { type: Type.STRING, description: "Nombre del producto" },
+                  quantity: { type: Type.NUMBER, description: "Cantidad de unidades" },
+                  priceTotal: { type: Type.NUMBER, description: "Precio TOTAL por esa línea (precio unitario * cantidad)" }
+                },
+                required: ["description", "quantity", "priceTotal"]
+              }
+            }
+          }
+        }
+      },
     });
 
-    clearTimeout(timeoutId);
+    const text = response.text;
+    if (!text) throw new Error("No text returned from Gemini");
 
-    if (!response.ok) {
-      let errorMessage = 'Error en el servidor';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.details || errorMessage;
-      } catch (e) {
-        if (response.status === 404) errorMessage = "No se encontró el endpoint /api/parse-receipt. Verifica la configuración de tu backend.";
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
+    const data = JSON.parse(text);
     
-    if (!data.items || !Array.isArray(data.items)) {
-      throw new Error("La respuesta del servidor no tiene el formato esperado.");
-    }
-
+    // Transform into internal ReceiptItem structure with IDs
     return data.items.map((item: any, index: number) => ({
       id: `item-${Date.now()}-${index}`,
       description: item.description,
@@ -42,12 +63,8 @@ export const parseReceiptImage = async (base64Image: string): Promise<ReceiptIte
       originalIndex: index
     }));
 
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error("El servidor tardó demasiado en responder. Inténtalo con una foto más ligera.");
-    }
-    console.error("Error en geminiService:", error);
+  } catch (error) {
+    console.error("Error parsing receipt:", error);
     throw error;
   }
 };
