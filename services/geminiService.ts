@@ -19,10 +19,12 @@ export const parseReceiptImage = async (base64Image: string): Promise<ReceiptIte
             },
           },
           {
-            text: `Analiza esta imagen de un ticket de restaurante. 
+            text: `
+            Eres un experto en OCR que se ocupa de analizar imagenes de ticket restaurante para extraer los nombres y cantidades de productos del ticket.
+            Analiza esta imagen de un ticket de restaurante. 
             Extrae cada línea de producto.
-            Si un item tiene cantidad mayor a 1 (ej: "2x Cerveza"), devuélvelo como un solo item con quantity 2.
-            Ignora subtotales, totales, impuestos o propinas, solo quiero los items consumibles.
+            Si un producto tiene cantidad mayor a 1 (ej: "2x Cerveza"), devuélvelo como un solo producto con cantidad 2.
+            Ignora subtotales, totales, impuestos o propinas, solo quiero los productos consumibles.
             Devuelve un JSON estricto.`,
           },
         ],
