@@ -22,11 +22,9 @@
       
       body {
         font-family: 'Inter', sans-serif;
-        /* Prevent bounce scroll on iOS when in standalone mode */
         overscroll-behavior-y: none;
       }
 
-      /* Custom scrollbar for better mobile feel in lists */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -35,29 +33,37 @@
         scrollbar-width: none;
       }
       
-      /* Aggressive Apple-like Silver Gradient */
       .apple-bg {
         background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
         background-attachment: fixed;
       }
+      
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.4s ease-out forwards;
+      }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "mqtt": "https://esm.sh/mqtt@5.10.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "mqtt": "https://esm.sh/mqtt@^5.14.1",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react/": "https://esm.sh/react@^19.2.3/"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
-</head>
+  </head>
   <body class="apple-bg text-zinc-900 antialiased h-screen overflow-hidden">
     <div id="root" class="h-full"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

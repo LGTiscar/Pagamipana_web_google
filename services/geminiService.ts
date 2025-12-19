@@ -1,70 +1,58 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptItem } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const base64ToBlob = async (base64Data: string): Promise<Blob> => {
+  const response = await fetch(base64Data);
+  return await response.blob();
+};
 
 export const parseReceiptImage = async (base64Image: string): Promise<ReceiptItem[]> => {
   try {
-    // Remove header if present (data:image/jpeg;base64,)
-    const cleanBase64 = base64Image.split(',')[1] || base64Image;
+    const blob = await base64ToBlob(base64Image);
+    const formData = new FormData();
+    formData.append('file', blob, 'ticket.jpg');
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          {
-            text: `Analiza esta imagen de un ticket de restaurante. 
-            Extrae cada línea de producto.
-            Si un item tiene cantidad mayor a 1 (ej: "2x Cerveza"), devuélvelo como un solo item con quantity 2.
-            Ignora subtotales, totales, impuestos o propinas, solo quiero los items consumibles.
-            Devuelve un JSON estricto.`,
-          },
-        ],
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            items: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  description: { type: Type.STRING, description: "Nombre del producto" },
-                  quantity: { type: Type.NUMBER, description: "Cantidad de unidades" },
-                  priceTotal: { type: Type.NUMBER, description: "Precio TOTAL por esa línea (precio unitario * cantidad)" }
-                },
-                required: ["description", "quantity", "priceTotal"]
-              }
-            }
-          }
-        }
-      },
+    const response = await fetch('https://hj22ziwwpjtkdgzpkdgi3ez7ii0ddtkj.lambda-url.eu-north-1.on.aws/api/ocr', {
+      method: 'POST',
+      body: formData,
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No text returned from Gemini");
+    if (!response.ok) throw new Error(`Error servidor (${response.status})`);
 
-    const data = JSON.parse(text);
-    
-    // Transform into internal ReceiptItem structure with IDs
-    return data.items.map((item: any, index: number) => ({
+    const rawData = await response.json();
+    let processedData = rawData;
+
+    if (rawData.text && typeof rawData.text === 'string') {
+      try {
+        // CORRECCIÓN SyntaxError: Algunos servidores devuelven saltos de línea literales (\n reales) 
+        // dentro de cadenas JSON, lo cual es inválido para JSON.parse().
+        // Limpiamos la cadena reemplazando saltos de línea reales por el carácter de escape \n.
+        const sanitizedText = rawData.text
+          .replace(/\r?\n/g, '\\n') // Reemplaza saltos de línea literales por \n escapado
+          .trim();
+        
+        processedData = JSON.parse(sanitizedText);
+      } catch (e) {
+        console.error('Error parseando text (incluso tras saneamiento):', e);
+        // Intentar parsear el original por si acaso
+        try {
+            processedData = JSON.parse(rawData.text);
+        } catch(e2) {}
+      }
+    }
+
+    const items = Array.isArray(processedData) ? processedData : (processedData.items || []);
+
+    if (!items || items.length === 0) throw new Error("Ticket vacío o ilegible.");
+
+    return items.map((item: any, index: number) => ({
       id: `item-${Date.now()}-${index}`,
-      description: item.description,
-      quantity: item.quantity || 1,
-      priceTotal: item.priceTotal,
+      description: (item.description || item.nombre || item.text || 'Producto').toUpperCase(),
+      quantity: Number(item.quantity || item.cantidad || 1),
+      priceTotal: parseFloat(item.priceTotal || item.precioTotal || item.total || 0),
       originalIndex: index
     }));
-
-  } catch (error) {
-    console.error("Error parsing receipt:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("OCR Error:", error);
+    throw new Error(error.message || "Error al procesar el ticket.");
   }
 };
