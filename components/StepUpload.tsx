@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, RefreshCw, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle, Share2 } from 'lucide-react';
+import { Camera, Upload, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle, Share2, Hash } from 'lucide-react';
 import { Button } from './Button';
 import { Logo } from './Logo';
 
@@ -87,7 +87,6 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
     return (
       <div className="flex flex-col h-full w-full animate-fade-in">
         {/* Single Scrollable Container including Buttons */}
-        {/* Added pt-10 to clear the notch/status bar area since header is hidden */}
         <div className="flex-1 overflow-y-auto px-2 no-scrollbar flex flex-col pt-10">
           <div className="text-center mb-6 shrink-0">
              <h2 className="text-2xl font-bold text-black tracking-tight">Revisar Ticket</h2>
@@ -130,119 +129,106 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
 
   // --- LAYOUT: INITIAL UPLOAD MODE ---
   return (
-    // Added pt-16 to ensure content clears the device notch
-    <div className="flex flex-col h-full overflow-y-auto no-scrollbar animate-fade-in px-4 pt-16 pb-8">
+    <div className="h-full flex flex-col animate-fade-in bg-transparent relative">
       
-      {/* Main Content Wrapper for Centering */}
-      <div className="flex-1 flex flex-col items-center justify-center space-y-8 min-h-[400px]">
-          <div className="text-center space-y-3">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-black text-white shadow-2xl mb-2">
-                <Logo size={56} strokeWidth={1.5} />
-            </div>
-            <div>
-                <h2 className="text-4xl font-bold text-black tracking-tight mb-2">PagaMiPana</h2>
-                <p className="text-zinc-600 text-lg font-medium">Deja que la IA haga el trabajo sucio</p>
-            </div>
-          </div>
+      {/* Scrollable Main Content */}
+      <div className="flex-1 overflow-y-auto no-scrollbar w-full">
+          {/* 
+             Layout Fix:
+             Use min-h-full + flex to center content vertically when screen is large,
+             but allow scrolling when screen is small without overlapping footer.
+             Updated: Reduced py from 12 to 6 to reduce empty space.
+          */}
+          <div className="w-full max-w-sm mx-auto px-4 min-h-full flex flex-col items-center justify-center py-6">
+              
+              {/* Reduced mb from 10 to 6 */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-black text-white shadow-2xl mb-4">
+                    <Logo size={56} strokeWidth={1.5} />
+                </div>
+                <div>
+                    <h2 className="text-4xl font-bold text-black tracking-tight mb-2">PagaMiPana</h2>
+                    <p className="text-zinc-600 text-lg font-medium">Deja que la IA haga el trabajo sucio</p>
+                </div>
+                
+                {/* Session Info Compact Row */}
+                <div className="flex items-center justify-center gap-5 mt-5">
+                    <button 
+                        onClick={copySessionId}
+                        className="group flex items-center gap-2 transition-all active:scale-95"
+                        title="Copiar código de sesión"
+                    >
+                         <Hash size={14} className="text-zinc-300 group-hover:text-black transition-colors" />
+                         <span className="text-xl font-mono font-bold text-zinc-900 tracking-widest border-b border-dashed border-zinc-300 group-hover:border-black pb-0.5 transition-colors">
+                            {sessionId}
+                         </span>
+                         {copied && <CheckCircle size={14} className="text-green-500 animate-fade-in" />}
+                    </button>
+                    
+                    <div className="w-px h-5 bg-zinc-300/50"></div>
 
-          {/* Interactive Drop/Click Zone */}
-          <div 
-            onClick={() => setShowOptions(true)}
-            className="relative w-full max-w-sm p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4 cursor-pointer hover:bg-white/40 active:scale-[0.98] group"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-          >
-            <div className="w-16 h-16 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
-                <Camera size={32} />
-            </div>
-            <p className="text-zinc-600 font-medium px-4 text-center">
-            Toca para subir el ticket
-            </p>
-          </div>
+                    <button 
+                        onClick={handleInvite}
+                        className={`text-sm font-semibold transition-all flex items-center gap-1.5 active:scale-95
+                            ${linkCopied ? 'text-green-600' : 'text-blue-500 hover:text-blue-600'}
+                        `}
+                    >
+                        {linkCopied ? <CheckCircle size={14} /> : <Share2 size={14} />}
+                        {linkCopied ? 'Copiado' : 'Invitar'}
+                    </button>
+                </div>
+              </div>
 
-          <div className="w-full max-w-sm space-y-3">
-            {/* Input explicitly for Camera */}
-            <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            ref={cameraInputRef}
-            className="hidden"
-            onChange={handleFileChange}
-            />
-            
-            {/* Input for Gallery (No capture attribute triggers standard picker) */}
-            <input
-            type="file"
-            accept="image/*"
-            ref={galleryInputRef}
-            className="hidden"
-            onChange={handleFileChange}
-            />
-            
-            <Button 
-            fullWidth 
-            variant="primary" 
-            icon={<Camera size={20} />}
-            onClick={() => cameraInputRef.current?.click()}
-            className="h-14 text-base shadow-lg"
-            >
-            Hacer Foto
-            </Button>
-            
-            <Button 
-            fullWidth 
-            variant="outline" 
-            icon={<Upload size={20} />}
-            onClick={() => galleryInputRef.current?.click()}
-            className="bg-white/50 border-white/50 backdrop-blur-md"
-            >
-            Subir desde galería
-            </Button>
+              {/* Interactive Drop/Click Zone */}
+              <div 
+                onClick={() => setShowOptions(true)}
+                className="w-full p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4 cursor-pointer hover:bg-white/40 active:scale-[0.98] group mb-6"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+              >
+                <div className="w-16 h-16 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
+                    <Camera size={32} />
+                </div>
+                <p className="text-zinc-600 font-medium px-4 text-center">
+                Toca para subir el ticket
+                </p>
+              </div>
 
-            <Button 
-            fullWidth 
-            variant="ghost" 
-            icon={<Users size={20} />}
-            onClick={onJoinSession}
-            className="text-zinc-600 hover:bg-zinc-100/50 mt-2"
-            >
-            Unirse a sesión existente
-            </Button>
-          </div>
-      </div>
+              <div className="w-full space-y-3">
+                {/* Inputs */}
+                <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
+                <input type="file" accept="image/*" ref={galleryInputRef} className="hidden" onChange={handleFileChange} />
+                
+                <Button 
+                fullWidth 
+                variant="primary" 
+                icon={<Camera size={20} />}
+                onClick={() => cameraInputRef.current?.click()}
+                className="h-14 text-base shadow-lg"
+                >
+                Hacer Foto
+                </Button>
+                
+                <Button 
+                fullWidth 
+                variant="outline" 
+                icon={<Upload size={20} />}
+                onClick={() => galleryInputRef.current?.click()}
+                className="bg-white/50 border-white/50 backdrop-blur-md"
+                >
+                Subir desde galería
+                </Button>
 
-      {/* Session ID Footer Display */}
-      <div className="w-full max-w-sm mx-auto mt-8 shrink-0 px-1">
-          <div className="bg-white/60 backdrop-blur-md border border-zinc-200/50 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-4">
-             <div className="flex-1 min-w-0">
-                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Tu Sesión</p>
-                 <button 
-                    onClick={copySessionId}
-                    className="flex items-center gap-2 group active:scale-95 transition-transform"
-                 >
-                     <span className="text-2xl font-mono font-bold text-zinc-800 tracking-widest truncate">{sessionId}</span>
-                     {copied ? (
-                         <CheckCircle size={16} className="text-green-500 shrink-0" />
-                     ) : (
-                         <Copy size={16} className="text-zinc-300 group-hover:text-black transition-colors shrink-0" />
-                     )}
-                 </button>
-             </div>
-             
-             <button 
-                onClick={handleInvite}
-                className={`
-                    px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition-all flex items-center gap-2 shrink-0
-                    ${linkCopied 
-                        ? 'bg-green-100 text-green-700 shadow-green-100' 
-                        : 'bg-black text-white shadow-black/10 hover:bg-zinc-800'
-                    }
-                `}
-             >
-                {linkCopied ? <CheckCircle size={16} /> : <Share2 size={16} />}
-                {linkCopied ? 'Copiado' : 'Invitar'}
-             </button>
+                <Button 
+                fullWidth 
+                variant="ghost" 
+                icon={<Users size={20} />}
+                onClick={onJoinSession}
+                className="text-zinc-600 hover:bg-zinc-100/50 mt-2"
+                >
+                Unirse a sesión existente
+                </Button>
+              </div>
           </div>
       </div>
 
