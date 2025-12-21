@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Sparkles, Image as ImageIcon, Users, Copy, CheckCircle, Share2, Hash } from 'lucide-react';
+import { Camera, Upload, Sparkles, Image as ImageIcon, Users, CheckCircle, Share2, Hash } from 'lucide-react';
 import { Button } from './Button';
 import { Logo } from './Logo';
 
@@ -135,66 +135,64 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
       <div className="flex-1 overflow-y-auto no-scrollbar w-full">
           {/* 
              Layout Fix:
-             Use min-h-full + flex to center content vertically when screen is large,
-             but allow scrolling when screen is small without overlapping footer.
-             Updated: Reduced py from 12 to 6 to reduce empty space.
+             Drastically reduced padding for mobile view.
           */}
-          <div className="w-full max-w-sm mx-auto px-4 min-h-full flex flex-col items-center justify-center py-6">
+          <div className="w-full max-w-sm mx-auto px-4 min-h-full flex flex-col items-center justify-center py-2">
               
-              {/* Reduced mb from 10 to 6 */}
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-black text-white shadow-2xl mb-4">
-                    <Logo size={56} strokeWidth={1.5} />
+              {/* Reduced margin-bottom */}
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-black text-white shadow-2xl mb-3">
+                    <Logo size={48} strokeWidth={1.5} />
                 </div>
                 <div>
-                    <h2 className="text-4xl font-bold text-black tracking-tight mb-2">PagaMiPana</h2>
-                    <p className="text-zinc-600 text-lg font-medium">Deja que la IA haga el trabajo sucio</p>
+                    <h2 className="text-3xl font-bold text-black tracking-tight mb-1">PagaMiPana</h2>
+                    <p className="text-zinc-600 text-base font-medium">Deja que la IA haga el trabajo sucio</p>
                 </div>
                 
-                {/* Session Info Compact Row */}
-                <div className="flex items-center justify-center gap-5 mt-5">
+                {/* Session Info Compact Row - Reduced margin top */}
+                <div className="flex items-center justify-center gap-4 mt-3">
                     <button 
                         onClick={copySessionId}
                         className="group flex items-center gap-2 transition-all active:scale-95"
                         title="Copiar código de sesión"
                     >
                          <Hash size={14} className="text-zinc-300 group-hover:text-black transition-colors" />
-                         <span className="text-xl font-mono font-bold text-zinc-900 tracking-widest border-b border-dashed border-zinc-300 group-hover:border-black pb-0.5 transition-colors">
+                         <span className="text-lg font-mono font-bold text-zinc-900 tracking-widest border-b border-dashed border-zinc-300 group-hover:border-black pb-0.5 transition-colors">
                             {sessionId}
                          </span>
                          {copied && <CheckCircle size={14} className="text-green-500 animate-fade-in" />}
                     </button>
                     
-                    <div className="w-px h-5 bg-zinc-300/50"></div>
+                    <div className="w-px h-4 bg-zinc-300/50"></div>
 
                     <button 
                         onClick={handleInvite}
-                        className={`text-sm font-semibold transition-all flex items-center gap-1.5 active:scale-95
-                            ${linkCopied ? 'text-green-600' : 'text-blue-500 hover:text-blue-600'}
+                        className={`text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 active:scale-95 px-2 py-1 rounded-md
+                            ${linkCopied ? 'text-green-600 bg-green-50' : 'text-blue-600 hover:bg-blue-50'}
                         `}
                     >
-                        {linkCopied ? <CheckCircle size={14} /> : <Share2 size={14} />}
+                        {linkCopied ? <CheckCircle size={12} /> : <Share2 size={12} />}
                         {linkCopied ? 'Copiado' : 'Invitar'}
                     </button>
                 </div>
               </div>
 
-              {/* Interactive Drop/Click Zone */}
+              {/* Interactive Drop/Click Zone - Reduced padding and margin */}
               <div 
                 onClick={() => setShowOptions(true)}
-                className="w-full p-10 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-4 cursor-pointer hover:bg-white/40 active:scale-[0.98] group mb-6"
+                className="w-full p-6 sm:p-8 border-2 border-dashed border-zinc-400/50 bg-white/30 backdrop-blur-sm rounded-3xl transition-all duration-300 flex flex-col items-center justify-center space-y-3 cursor-pointer hover:bg-white/40 active:scale-[0.98] group mb-4"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
               >
-                <div className="w-16 h-16 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
-                    <Camera size={32} />
+                <div className="w-14 h-14 bg-white/50 group-hover:bg-white/80 transition-colors rounded-full flex items-center justify-center mx-auto text-zinc-500">
+                    <Camera size={28} />
                 </div>
-                <p className="text-zinc-600 font-medium px-4 text-center">
+                <p className="text-zinc-600 font-medium px-4 text-center text-sm">
                 Toca para subir el ticket
                 </p>
               </div>
 
-              <div className="w-full space-y-3">
+              <div className="w-full space-y-2">
                 {/* Inputs */}
                 <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
                 <input type="file" accept="image/*" ref={galleryInputRef} className="hidden" onChange={handleFileChange} />
@@ -202,9 +200,9 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
                 <Button 
                 fullWidth 
                 variant="primary" 
-                icon={<Camera size={20} />}
+                icon={<Camera size={18} />}
                 onClick={() => cameraInputRef.current?.click()}
-                className="h-14 text-base shadow-lg"
+                className="h-12 text-sm shadow-lg"
                 >
                 Hacer Foto
                 </Button>
@@ -212,9 +210,9 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
                 <Button 
                 fullWidth 
                 variant="outline" 
-                icon={<Upload size={20} />}
+                icon={<Upload size={18} />}
                 onClick={() => galleryInputRef.current?.click()}
-                className="bg-white/50 border-white/50 backdrop-blur-md"
+                className="h-12 text-sm bg-white/50 border-white/50 backdrop-blur-md"
                 >
                 Subir desde galería
                 </Button>
@@ -222,9 +220,9 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
                 <Button 
                 fullWidth 
                 variant="ghost" 
-                icon={<Users size={20} />}
+                icon={<Users size={18} />}
                 onClick={onJoinSession}
-                className="text-zinc-600 hover:bg-zinc-100/50 mt-2"
+                className="h-10 text-sm text-zinc-500 hover:bg-zinc-100/50 mt-1"
                 >
                 Unirse a sesión existente
                 </Button>
