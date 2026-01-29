@@ -3,7 +3,6 @@ import { StepUpload } from './components/StepUpload';
 import { StepPeople } from './components/StepPeople';
 import { StepAssign } from './components/StepAssign';
 import { StepResults } from './components/StepResults';
-import { parseReceiptImage } from './services/geminiService';
 import { AppStep, ReceiptItem, SplitItem, Person, Assignment, SyncPayload } from './types';
 import { Loader2, AlertCircle, ArrowRight, Hash, ChevronLeft } from 'lucide-react';
 import mqtt from 'mqtt';
@@ -178,7 +177,47 @@ export default function App() {
     setStep(AppStep.PEOPLE);
     setError(null);
     try {
-      const items = await parseReceiptImage(base64);
+      console.log('Enviando imagen al backend de AWS Lambda...');
+      
+      // Llamada al backend CORRECTO con el endpoint específico para base64
+      const response = await fetch('https://hj22ziwwpjtkdgzpkdgi3ez7ii0ddtkj.lambda-url.eu-north-1.on.aws/api/ocr/base64', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      });
+
+      if (!response.ok) {
+          throw new Error(`Error del servidor (${response.status}). Inténtalo de nuevo.`);
+      }
+      
+      const data = await response.json();
+      console.log('Respuesta COMPLETA del backend:', data); 
+
+      // Intento robusto de encontrar los items
+      let itemsArray = [];
+      if (Array.isArray(data)) {
+          itemsArray = data;
+      } else if (data.structured_data && Array.isArray(data.structured_data.items)) {
+          // Caso específico para tu respuesta actual
+          itemsArray = data.structured_data.items;
+      } else if (data.items && Array.isArray(data.items)) {
+          itemsArray = data.items;
+      } else if (data.receipt && data.receipt.items && Array.isArray(data.receipt.items)) {
+          itemsArray = data.receipt.items;
+      }
+      
+      if (!itemsArray || itemsArray.length === 0) {
+          throw new Error("No se encontraron productos en el ticket. ¿Está borrosa la foto?");
+      }
+
+      const items: ReceiptItem[] = itemsArray.map((item: any, idx: number) => ({
+        id: `item-${idx}-${Date.now()}`,
+        description: item.description || item.name || "Producto sin nombre",
+        quantity: Number(item.quantity) || 1,
+        priceTotal: Number(item.priceTotal || item.price || item.total || 0),
+        originalIndex: idx
+      }));
+
       setRawItems(items);
       const flattened = flattenItems(items);
       setSplitItems(flattened);
@@ -194,7 +233,8 @@ export default function App() {
         }
       });
     } catch (err: any) {
-      setError(err.message || "No pudimos leer el ticket.");
+      console.error("Error al procesar ticket:", err);
+      setError(err.message || "Error de conexión con el servidor.");
       setLoadingItems(false);
     }
   };
