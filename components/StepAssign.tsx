@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import { Check, Users, ChevronDown, ChevronUp, Plus, Minus, List, Layers, UserPlus, Link as LinkIcon, CheckCircle, Share } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Check, Users, ChevronDown, ChevronUp, Plus, Minus, List, Layers, UserPlus, Link as LinkIcon, CheckCircle, Share, Edit2, Check as CheckIcon } from 'lucide-react';
 import { Button } from './Button';
 import { SplitItem, Person, Assignment } from '../types';
 
 interface StepAssignProps {
   items: SplitItem[];
+  setItems: React.Dispatch<React.SetStateAction<SplitItem[]>>;
   people: Person[];
   assignments: Assignment;
   setAssignments: React.Dispatch<React.SetStateAction<Assignment>>;
@@ -15,6 +16,7 @@ interface StepAssignProps {
 
 export const StepAssign: React.FC<StepAssignProps> = ({ 
   items, 
+  setItems,
   people, 
   assignments, 
   setAssignments, 
@@ -26,8 +28,14 @@ export const StepAssign: React.FC<StepAssignProps> = ({
   const [detailedMode, setDetailedMode] = useState(false);
   const [expandedSubItem, setExpandedSubItem] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  
+  // State for inline editing
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editPriceValue, setEditPriceValue] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const handleGroupToggle = (groupId: string) => {
+    if (editingGroupId) return; // Don't toggle while editing
     if (expandedGroup === groupId) {
         setExpandedGroup(null);
     } else {
@@ -39,8 +47,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
 
   const handleInvite = async () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
-    
-    // Use native sharing if available (Mobile phones mostly)
     if (navigator.share) {
       try {
         await navigator.share({
@@ -48,13 +54,10 @@ export const StepAssign: React.FC<StepAssignProps> = ({
           text: '¡Entra a dividir la cuenta conmigo!',
           url: url,
         });
-        // Don't show "Copied" state if share sheet was opened, as feedback is handled by OS
       } catch (err) {
-        // Fallback if user cancels or error occurs
         console.log('Share dismissed', err);
       }
     } else {
-      // Fallback for Desktop: Copy to clipboard
       navigator.clipboard.writeText(url).then(() => {
           setCopiedLink(true);
           setTimeout(() => setCopiedLink(false), 2000);
@@ -62,10 +65,11 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     }
   };
 
+  // Group by originalReceiptItemId to keep consistency if description/price changes locally
   const groupedItems = useMemo(() => {
     const groups: Record<string, SplitItem[]> = {};
     items.forEach(item => {
-      const key = `${item.description}-${item.price}`;
+      const key = item.originalReceiptItemId;
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
@@ -91,13 +95,9 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     });
   };
 
-  // UPDATED: "Winner Takes All" Logic for Quick Assignment
   const toggleGroupBulkAssignment = (groupItems: SplitItem[], personId: string) => {
     setAssignments(prev => {
       const next = { ...prev };
-      
-      // Check if this person ALREADY owns ALL items in the group exclusively
-      // (This allows toggle off behavior)
       const isFullyOwnedByPerson = groupItems.every(item => {
         const assigned = next[item.id] || [];
         return assigned.length === 1 && assigned[0] === personId;
@@ -105,11 +105,8 @@ export const StepAssign: React.FC<StepAssignProps> = ({
       
       groupItems.forEach(item => {
         if (isFullyOwnedByPerson) {
-          // If they have it all, clear it (deselect)
           next[item.id] = [];
         } else {
-          // Otherwise, give them EVERYTHING (Exclusive assignment)
-          // This removes any other people previously assigned to these items
           next[item.id] = [personId];
         }
       });
@@ -121,15 +118,13 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     setAssignments(prev => {
       const next = { ...prev };
       if (delta === 1) {
-        // Find an item in the group that has NO ONE assigned yet
         const availableItem = groupItems.find(item => (next[item.id] || []).length === 0);
         if (availableItem) next[availableItem.id] = [personId];
       } else {
-        // Find an item assigned strictly to this person
         const targetItem = groupItems.find(item => {
             const assigned = next[item.id] || [];
             return assigned.length === 1 && assigned[0] === personId;
-        }) || groupItems.find(item => (next[item.id] || []).includes(personId)); // Fallback if they are part of a group
+        }) || groupItems.find(item => (next[item.id] || []).includes(personId));
 
         if (targetItem) {
              const current = next[targetItem.id] || [];
@@ -144,6 +139,45 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     return groupItems.filter(item => (assignments[item.id] || []).includes(personId)).length;
   };
 
+  const startEditingPrice = (e: React.MouseEvent, groupId: string, currentTotalPrice: number) => {
+    e.stopPropagation();
+    setEditingGroupId(groupId);
+    setEditPriceValue(currentTotalPrice.toFixed(2));
+  };
+
+  const saveEditedPrice = () => {
+    if (editingGroupId) {
+        const newTotal = parseFloat(editPriceValue);
+        if (!isNaN(newTotal)) {
+            setItems(prev => {
+                const groupToUpdate = prev.filter(i => i.originalReceiptItemId === editingGroupId);
+                const qty = groupToUpdate.length;
+                const newUnitPrice = newTotal / qty;
+                
+                return prev.map(item => {
+                    if (item.originalReceiptItemId === editingGroupId) {
+                        return { ...item, price: newUnitPrice };
+                    }
+                    return item;
+                });
+            });
+        }
+    }
+    setEditingGroupId(null);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') saveEditedPrice();
+    if (e.key === 'Escape') setEditingGroupId(null);
+  };
+
+  useEffect(() => {
+    if (editingGroupId && editInputRef.current) {
+        editInputRef.current.focus();
+        editInputRef.current.select();
+    }
+  }, [editingGroupId]);
+
   const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
   const formatPrice = (amount: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
 
@@ -153,11 +187,9 @@ export const StepAssign: React.FC<StepAssignProps> = ({
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto w-full relative">
-      {/* Header - Sticky Progress Bar & Invite */}
       <div className="bg-white/90 backdrop-blur-md border-b border-zinc-100 sticky top-0 z-10 pb-4 pt-2 shadow-sm shrink-0">
         <div className="flex justify-between items-center mb-3 px-4">
             <h2 className="text-xl font-bold text-black tracking-tight">Asignar gastos</h2>
-            
             <div className="flex items-center gap-2">
                {peerCount > 1 && (
                  <span className="flex items-center text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100 animate-pulse">
@@ -177,10 +209,7 @@ export const StepAssign: React.FC<StepAssignProps> = ({
             </div>
         </div>
         <div className="w-full bg-zinc-100 h-1.5">
-            <div 
-                className="bg-black h-1.5 transition-all duration-500 ease-out" 
-                style={{ width: `${progress}%` }}
-            ></div>
+            <div className="bg-black h-1.5 transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div>
         </div>
       </div>
 
@@ -189,8 +218,9 @@ export const StepAssign: React.FC<StepAssignProps> = ({
             {groupedItems.map((group) => {
                 const representative = group[0];
                 const quantity = group.length;
-                const groupId = representative.id; 
+                const groupId = representative.originalReceiptItemId; 
                 const isExpanded = expandedGroup === groupId;
+                const isEditing = editingGroupId === groupId;
                 
                 const fullyAssignedCount = group.filter(i => (assignments[i.id] || []).length > 0).length;
                 const isFullyAssigned = fullyAssignedCount === quantity;
@@ -206,9 +236,8 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                             ${isFullyAssigned ? 'border-zinc-300 ring-1 ring-zinc-100' : 'border-zinc-200 hover:border-zinc-300'}
                         `}
                     >
-                        {/* Header Row */}
                         <div 
-                            className="p-4 cursor-pointer active:bg-zinc-50 flex items-start gap-4"
+                            className={`p-4 cursor-pointer active:bg-zinc-50 flex items-start gap-4 ${isEditing ? 'cursor-default active:bg-transparent' : ''}`}
                             onClick={() => handleGroupToggle(groupId)}
                         >
                             <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center border shrink-0 transition-colors
@@ -228,10 +257,34 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                         {quantity > 1 && <span className="font-bold text-black mr-2 bg-zinc-100 px-1.5 py-0.5 rounded text-sm">{quantity}x</span>}
                                         {representative.description}
                                     </span>
-                                    <div className="text-right">
-                                        <span className="font-bold text-zinc-900 block">
-                                            {formatPrice(representative.price * quantity)}
-                                        </span>
+                                    <div className="text-right flex flex-col items-end">
+                                        {isEditing ? (
+                                            <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg border border-zinc-200">
+                                                <input
+                                                    ref={editInputRef}
+                                                    type="number"
+                                                    value={editPriceValue}
+                                                    onChange={(e) => setEditPriceValue(e.target.value)}
+                                                    onKeyDown={handleEditKeyDown}
+                                                    onBlur={saveEditedPrice}
+                                                    className="w-16 bg-transparent text-right font-bold text-zinc-900 outline-none p-0"
+                                                    step="0.01"
+                                                />
+                                                <span className="text-xs font-bold mr-1">€</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1 group/price">
+                                                <span className="font-bold text-zinc-900 block">
+                                                    {formatPrice(representative.price * quantity)}
+                                                </span>
+                                                <button 
+                                                    onClick={(e) => startEditingPrice(e, groupId, representative.price * quantity)}
+                                                    className="p-1 rounded-md text-zinc-400 hover:text-black hover:bg-zinc-100 transition-all"
+                                                >
+                                                    <Edit2 size={12} />
+                                                </button>
+                                            </div>
+                                        )}
                                         {quantity > 1 && (
                                             <span className="text-xs text-zinc-400 font-normal">
                                                 {formatPrice(representative.price)}/ud
@@ -239,7 +292,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                         )}
                                     </div>
                                 </div>
-                                
                                 <div className="flex items-center mt-2 flex-wrap gap-1 min-h-[20px]">
                                     {assignedPeople.length > 0 ? (
                                         <div className="flex -space-x-2 overflow-hidden py-1">
@@ -256,14 +308,10 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                             </div>
                         </div>
 
-                        {/* Expanded Content */}
                         {isExpanded && (
                             <div className="border-t border-zinc-100 bg-zinc-50/50 p-5 animate-fade-in">
-                                
                                 {quantity > 1 ? (
                                     <div className="space-y-6">
-                                        
-                                        {/* Toggle Tabs */}
                                         <div className="flex items-center justify-between bg-white p-1 rounded-xl border border-zinc-200 shadow-sm">
                                             <button
                                                 onClick={() => setDetailedMode(false)}
@@ -282,7 +330,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                         </div>
 
                                         {!detailedMode ? (
-                                            // "Individuales" Mode (Formerly Counters)
                                             <>
                                                 <div>
                                                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">
@@ -290,12 +337,10 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                     </p>
                                                     <div className="flex flex-wrap gap-2">
                                                         {people.map(person => {
-                                                            // Logic Update for UI: Check if person owns ALL items exclusively
                                                             const isOwner = group.every(i => {
                                                                 const assigned = assignments[i.id] || [];
                                                                 return assigned.length === 1 && assigned[0] === person.id;
                                                             });
-
                                                             return (
                                                                 <button
                                                                     key={person.id}
@@ -313,9 +358,7 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                         })}
                                                     </div>
                                                 </div>
-                                                
                                                 <div className="h-px bg-zinc-200" />
-
                                                 <div>
                                                     <div className="flex justify-between items-center mb-3">
                                                         <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
@@ -336,7 +379,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                                         </div>
                                                                         <span className="text-sm font-semibold text-zinc-800">{person.name}</span>
                                                                     </div>
-                                                                    
                                                                     <div className="flex items-center gap-3">
                                                                         <button 
                                                                             onClick={() => modifyPersonCount(group, person.id, -1)}
@@ -350,7 +392,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                                         </span>
                                                                         <button 
                                                                             onClick={() => modifyPersonCount(group, person.id, 1)}
-                                                                            // FIXED: Strictly disable if all items are assigned, regardless of user's current count
                                                                             disabled={fullyAssignedCount >= quantity}
                                                                             className="w-8 h-8 flex items-center justify-center rounded-full bg-black text-white hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                                                         >
@@ -364,7 +405,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                 </div>
                                             </>
                                         ) : (
-                                            // "Compartido" Mode (Formerly Detailed)
                                             <div className="space-y-3">
                                                 <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">
                                                      Dividir cada unidad ({quantity}) entre varios:
@@ -372,7 +412,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                 {group.map((item, index) => {
                                                     const assignedToItem = (assignments[item.id] || []).map(id => people.find(p => p.id === id)).filter(Boolean) as Person[];
                                                     const isSubExpanded = expandedSubItem === item.id;
-                                                    
                                                     return (
                                                         <div key={item.id} className="bg-white rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
                                                             <div 
@@ -394,7 +433,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                                 </div>
                                                                 {isSubExpanded ? <ChevronUp size={16} className="text-zinc-400"/> : <ChevronDown size={16} className="text-zinc-400"/>}
                                                             </div>
-
                                                             {isSubExpanded && (
                                                                 <div className="bg-zinc-50 p-3 border-t border-zinc-100 grid grid-cols-4 gap-2">
                                                                     {people.map(person => {
@@ -403,8 +441,7 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                                             <button
                                                                                 key={person.id}
                                                                                 onClick={(e) => { e.stopPropagation(); toggleAssignment(item.id, person.id); }}
-                                                                                className={`
-                                                                                    flex flex-col items-center p-2 rounded-lg border transition-all
+                                                                                className={`flex flex-col items-center p-2 rounded-lg border transition-all
                                                                                     ${isSelected ? 'bg-white border-black shadow-md ring-1 ring-black/5' : 'bg-transparent border-transparent hover:bg-white hover:border-zinc-200'}
                                                                                 `}
                                                                             >
@@ -423,7 +460,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                         )}
                                     </div>
                                 ) : (
-                                    // Single Item
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
                                             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Asignar a:</span>
@@ -442,8 +478,7 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                     <button
                                                         key={person.id}
                                                         onClick={() => toggleAssignment(representative.id, person.id)}
-                                                        className={`
-                                                            relative flex flex-col items-center p-3 rounded-xl border transition-all
+                                                        className={`relative flex flex-col items-center p-3 rounded-xl border transition-all
                                                             ${isSelected ? 'bg-zinc-900 border-black shadow-lg transform -translate-y-0.5' : 'bg-white border-zinc-200 hover:bg-zinc-50'}
                                                         `}
                                                     >
@@ -471,7 +506,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
             })}
         </div>
 
-        {/* Footer inline at the bottom */}
         <div className="py-8 shrink-0 flex flex-col gap-3">
             <div className="flex items-center justify-between px-2">
                  <p className="text-xs font-medium text-zinc-400">
@@ -481,13 +515,7 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                     <div className="h-full bg-black" style={{ width: `${progress}%` }}></div>
                 </div>
             </div>
-            <Button 
-                onClick={onNext}
-                className="w-full"
-                disabled={progress < 100} 
-            >
-                Finalizar
-            </Button>
+            <Button onClick={onNext} className="w-full" disabled={progress < 100}>Finalizar</Button>
         </div>
       </div>
     </div>

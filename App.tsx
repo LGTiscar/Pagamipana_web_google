@@ -38,7 +38,7 @@ export default function App() {
   const [splitItems, setSplitItems] = useState<SplitItem[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [assignments, setAssignments] = useState<Assignment>({});
-  const [loading, setLoading] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [sessionId, setSessionId] = useState<string>("");
@@ -153,6 +153,20 @@ export default function App() {
   }, [assignments, step]);
 
   useEffect(() => {
+    if (!isRemoteUpdate.current && splitItems.length > 0 && step === AppStep.ASSIGN) {
+        broadcast({ 
+          type: 'SYNC_STATE', 
+          payload: { 
+            items: splitItems, 
+            people: stateRef.current.people, 
+            assignments: stateRef.current.assignments, 
+            step: stateRef.current.step 
+          } 
+        });
+    }
+  }, [splitItems]);
+
+  useEffect(() => {
     if (!isRemoteUpdate.current && people.length > 0) {
          broadcast({ type: 'UPDATE_PEOPLE', payload: people });
     }
@@ -160,24 +174,28 @@ export default function App() {
 
   const handleImageSelected = async (base64: string) => {
     setReceiptImage(base64);
-    setLoading(true);
-    setStep(AppStep.PROCESSING);
+    setLoadingItems(true);
+    setStep(AppStep.PEOPLE);
     setError(null);
     try {
       const items = await parseReceiptImage(base64);
       setRawItems(items);
       const flattened = flattenItems(items);
       setSplitItems(flattened);
-      setStep(AppStep.PEOPLE);
+      setLoadingItems(false);
+      
       broadcast({
         type: 'SYNC_STATE',
-        payload: { items: flattened, people: stateRef.current.people, assignments: {}, step: AppStep.PEOPLE }
+        payload: { 
+          items: flattened, 
+          people: stateRef.current.people, 
+          assignments: {}, 
+          step: AppStep.PEOPLE 
+        }
       });
     } catch (err: any) {
       setError(err.message || "No pudimos leer el ticket.");
-      setStep(AppStep.UPLOAD);
-    } finally {
-      setLoading(false);
+      setLoadingItems(false);
     }
   };
 
@@ -187,9 +205,6 @@ export default function App() {
         clientRef.current = null;
     }
     
-    // CORRECCIÓN DEFINITIVA SecurityError:
-    // 1. Usamos URLSearchParams de forma puramente relativa.
-    // 2. Envolvemos en try-catch para que la app no pete si el navegador bloquea pushState.
     const params = new URLSearchParams(window.location.search);
     params.set('session', newId);
     try {
@@ -205,7 +220,7 @@ export default function App() {
     setSplitItems([]);
     setPeople([]);
     setAssignments({});
-    setLoading(false);
+    setLoadingItems(false);
     setError(null);
     setPeerCount(1);
     setShowJoinInput(false);
@@ -287,24 +302,31 @@ export default function App() {
       )}
 
       <main className="flex-1 w-full max-w-3xl mx-auto relative overflow-hidden flex flex-col">
-        {step === AppStep.PROCESSING && (
-           <div className="flex flex-col items-center justify-center h-full space-y-6">
-              <Loader2 className="w-16 h-16 text-black animate-spin" />
-              <div className="text-center">
-                  <p className="text-xl font-bold text-black mb-1">Leyendo ticket...</p>
-                  <p className="text-sm text-zinc-500">La IA está trabajando</p>
-              </div>
-           </div>
-        )}
-        {error && step === AppStep.UPLOAD && (
-            <div className="mx-4 mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-600 shadow-sm mt-4 animate-fade-in">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <p className="text-sm font-semibold">{error}</p>
-            </div>
-        )}
         {step === AppStep.UPLOAD && <StepUpload onImageSelected={handleImageSelected} onJoinSession={() => setShowJoinInput(true)} sessionId={sessionId} />}
-        {step === AppStep.PEOPLE && <StepPeople people={people} setPeople={setPeople} onNext={() => setStep(AppStep.ASSIGN)} />}
-        {step === AppStep.ASSIGN && <StepAssign items={splitItems} people={people} assignments={assignments} setAssignments={setAssignments} onNext={() => setStep(AppStep.RESULTS)} sessionId={sessionId} peerCount={peerCount} />}
+        
+        {step === AppStep.PEOPLE && (
+          <StepPeople 
+            people={people} 
+            setPeople={setPeople} 
+            onNext={() => setStep(AppStep.ASSIGN)} 
+            isProcessingReceipt={loadingItems}
+            receiptError={error}
+            receiptThumbnail={receiptImage}
+          />
+        )}
+        
+        {step === AppStep.ASSIGN && (
+          <StepAssign 
+            items={splitItems} 
+            setItems={setSplitItems}
+            people={people} 
+            assignments={assignments} 
+            setAssignments={setAssignments} 
+            onNext={() => setStep(AppStep.RESULTS)} 
+            sessionId={sessionId} 
+            peerCount={peerCount} 
+          />
+        )}
         {step === AppStep.RESULTS && <StepResults items={splitItems} people={people} assignments={assignments} onReset={handleReset} />}
       </main>
     </div>

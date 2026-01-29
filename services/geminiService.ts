@@ -5,6 +5,25 @@ const base64ToBlob = async (base64Data: string): Promise<Blob> => {
   return await response.blob();
 };
 
+const cleanJsonString = (text: string): string => {
+  // Remove markdown blocks if present
+  let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  
+  // Find boundaries of JSON object or array
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  const start = (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) ? firstBrace : firstBracket;
+
+  const lastBrace = cleaned.lastIndexOf('}');
+  const lastBracket = cleaned.lastIndexOf(']');
+  const end = (lastBrace !== -1 && (lastBracket === -1 || lastBrace > lastBracket)) ? lastBrace : lastBracket;
+
+  if (start !== -1 && end !== -1 && end > start) {
+    return cleaned.substring(start, end + 1);
+  }
+  return cleaned;
+};
+
 export const parseReceiptImage = async (base64Image: string): Promise<ReceiptItem[]> => {
   try {
     const blob = await base64ToBlob(base64Image);
@@ -23,17 +42,11 @@ export const parseReceiptImage = async (base64Image: string): Promise<ReceiptIte
 
     if (rawData.text && typeof rawData.text === 'string') {
       try {
-        // CORRECCIÓN SyntaxError: Algunos servidores devuelven saltos de línea literales (\n reales) 
-        // dentro de cadenas JSON, lo cual es inválido para JSON.parse().
-        // Limpiamos la cadena reemplazando saltos de línea reales por el carácter de escape \n.
-        const sanitizedText = rawData.text
-          .replace(/\r?\n/g, '\\n') // Reemplaza saltos de línea literales por \n escapado
-          .trim();
-        
+        const sanitizedText = cleanJsonString(rawData.text);
         processedData = JSON.parse(sanitizedText);
       } catch (e) {
-        console.error('Error parseando text (incluso tras saneamiento):', e);
-        // Intentar parsear el original por si acaso
+        console.error('Error parseando JSON tras limpieza:', e);
+        // Fallback simplified parse attempt
         try {
             processedData = JSON.parse(rawData.text);
         } catch(e2) {}
