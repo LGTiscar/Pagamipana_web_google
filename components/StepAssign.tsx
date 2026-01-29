@@ -29,13 +29,12 @@ export const StepAssign: React.FC<StepAssignProps> = ({
   const [expandedSubItem, setExpandedSubItem] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   
-  // State for inline editing
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editPriceValue, setEditPriceValue] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const handleGroupToggle = (groupId: string) => {
-    if (editingGroupId) return; // Don't toggle while editing
+    if (editingGroupId) return;
     if (expandedGroup === groupId) {
         setExpandedGroup(null);
     } else {
@@ -65,7 +64,6 @@ export const StepAssign: React.FC<StepAssignProps> = ({
     }
   };
 
-  // Group by originalReceiptItemId to keep consistency if description/price changes locally
   const groupedItems = useMemo(() => {
     const groups: Record<string, SplitItem[]> = {};
     items.forEach(item => {
@@ -273,13 +271,14 @@ export const StepAssign: React.FC<StepAssignProps> = ({
                                                 <span className="text-xs font-bold mr-1">€</span>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-1 group/price">
+                                            <div className="flex items-center gap-1">
                                                 <span className="font-bold text-zinc-900 block">
                                                     {formatPrice(representative.price * quantity)}
                                                 </span>
                                                 <button 
                                                     onClick={(e) => startEditingPrice(e, groupId, representative.price * quantity)}
                                                     className="p-1 rounded-md text-zinc-400 hover:text-black hover:bg-zinc-100 transition-all"
+                                                    title="Editar precio"
                                                 >
                                                     <Edit2 size={12} />
                                                 </button>
