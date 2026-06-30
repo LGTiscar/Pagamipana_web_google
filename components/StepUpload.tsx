@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, Sparkles, Image as ImageIcon, Users, CheckCircle, Share2, Hash } from 'lucide-react';
+import { Camera, Upload, Sparkles, Image as ImageIcon, Users, CheckCircle, Share2, Hash, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 import { Logo } from './Logo';
+import { processImageFile } from '../services/imageProcessor';
 
 interface StepUploadProps {
   onImageSelected: (base64: string) => void;
@@ -16,6 +17,8 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
   const [showOptions, setShowOptions] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -23,10 +26,21 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
     if (e.target) e.target.value = '';
   };
 
-  const processFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => setPreviewUrl(reader.result as string);
-    reader.readAsDataURL(file);
+  // Normalize every selected image (HEIC -> JPEG, downscale + compress) before
+  // it ever reaches the preview or the backend, so RAW/HEIC iPhone photos and
+  // oversized phone shots no longer error out on upload.
+  const processFile = async (file: File) => {
+    setError(null);
+    setProcessing(true);
+    try {
+      const dataUrl = await processImageFile(file);
+      setPreviewUrl(dataUrl);
+    } catch (err: any) {
+      console.error('Error procesando imagen', err);
+      setError(err?.message || 'No se pudo procesar la imagen. Inténtalo con otra foto.');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -115,9 +129,16 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
                 <p className="text-zinc-500 font-semibold text-sm">Toca para subir el ticket</p>
               </div>
 
+              {error && (
+                <div className="w-full mb-4 flex items-start gap-2 bg-red-50 border border-red-100 text-red-600 rounded-2xl px-4 py-3 animate-fade-in">
+                  <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium">{error}</p>
+                </div>
+              )}
+
               <div className="w-full space-y-2">
-                <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
-                <input type="file" accept="image/*" ref={galleryInputRef} className="hidden" onChange={handleFileChange} />
+                <input type="file" accept="image/*,.heic,.heif" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
+                <input type="file" accept="image/*,.heic,.heif" ref={galleryInputRef} className="hidden" onChange={handleFileChange} />
                 <Button fullWidth variant="primary" icon={<Camera size={18} />} onClick={() => cameraInputRef.current?.click()} className="h-12">Hacer Foto</Button>
                 <Button fullWidth variant="outline" icon={<Upload size={18} />} onClick={() => galleryInputRef.current?.click()} className="h-12 bg-white/50">Subir desde galería</Button>
                 <Button fullWidth variant="ghost" icon={<Users size={18} />} onClick={onJoinSession} className="h-10 text-zinc-400">Unirse a sesión</Button>
@@ -139,6 +160,13 @@ export const StepUpload: React.FC<StepUploadProps> = ({ onImageSelected, onJoinS
              </div>
              <button onClick={() => setShowOptions(false)} className="w-full py-4 bg-white rounded-2xl text-lg font-bold text-blue-600 shadow-xl">Cancelar</button>
           </div>
+        </div>
+      )}
+
+      {processing && (
+        <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm animate-fade-in">
+          <Loader2 className="w-10 h-10 text-black animate-spin mb-3" />
+          <p className="text-sm font-semibold text-zinc-700">Optimizando imagen...</p>
         </div>
       )}
     </div>
