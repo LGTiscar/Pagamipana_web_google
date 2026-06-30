@@ -4,7 +4,7 @@ import { StepPeople } from './components/StepPeople';
 import { StepAssign } from './components/StepAssign';
 import { StepResults } from './components/StepResults';
 import { AppStep, ReceiptItem, SplitItem, Person, Assignment, SyncPayload } from './types';
-import { Loader2, AlertCircle, ArrowRight, Hash, ChevronLeft } from 'lucide-react';
+import { Loader2, ArrowRight, Hash, ChevronLeft } from 'lucide-react';
 import mqtt from 'mqtt';
 import { Button } from './components/Button';
 
@@ -45,7 +45,7 @@ export default function App() {
   const [peerCount, setPeerCount] = useState(1);
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [manualSessionCode, setManualSessionCode] = useState('');
-  
+
   const isRemoteUpdate = useRef(false);
   const clientRef = useRef<mqtt.MqttClient | null>(null);
   const stateRef = useRef({ step, splitItems, people, assignments });
@@ -58,7 +58,7 @@ export default function App() {
     setSessionId(id);
     setIsSyncing(true);
     const topic = `${TOPIC_PREFIX}/${id}`;
-    
+
     const client = mqtt.connect(MQTT_BROKER_URL, {
         clientId: `user-${Math.random().toString(16).substring(2, 8)}`,
         keepalive: 60,
@@ -97,12 +97,17 @@ export default function App() {
                 isRemoteUpdate.current = true;
                 setAssignments(msg.payload);
                 setTimeout(() => isRemoteUpdate.current = false, 100);
+            } else if (msg.type === 'PATCH_ASSIGNMENT') {
+                // Delta: merge only the keys that changed. Edits to other lines survive.
+                isRemoteUpdate.current = true;
+                setAssignments(prev => ({ ...prev, ...msg.payload }));
+                setTimeout(() => isRemoteUpdate.current = false, 100);
             } else if (msg.type === 'UPDATE_PEOPLE') {
                  isRemoteUpdate.current = true;
                  setPeople(msg.payload);
                  setTimeout(() => isRemoteUpdate.current = false, 100);
             } else if (msg.type === 'REQUEST_SYNC') {
-                setPeerCount(prev => prev + 1); 
+                setPeerCount(prev => prev + 1);
                 const currentState = stateRef.current;
                 if (currentState.splitItems.length > 0) {
                      const response: SyncPayload = {
@@ -132,6 +137,15 @@ export default function App() {
       }
   };
 
+  // Delta-based assignment update: apply locally AND broadcast only the changed
+  // keys. Passed down to StepAssign. Replaces the old "broadcast the whole
+  // assignments object on every change" effect, so two people editing different
+  // lines at the same time no longer overwrite each other.
+  const patchAssignments = (delta: Assignment) => {
+      setAssignments(prev => ({ ...prev, ...delta }));
+      broadcast({ type: 'PATCH_ASSIGNMENT', payload: delta });
+  };
+
   const generateCode = () => Math.floor(10000 + Math.random() * 90000).toString();
 
   useEffect(() => {
@@ -143,24 +157,23 @@ export default function App() {
         setSessionId(newId);
         initSession(newId);
     }
-  }, []); 
+  }, []);
 
-  useEffect(() => {
-    if (!isRemoteUpdate.current && step === AppStep.ASSIGN) {
-        broadcast({ type: 'UPDATE_ASSIGNMENTS', payload: assignments });
-    }
-  }, [assignments, step]);
+  // NOTE: the old `useEffect([assignments, step])` that broadcast the full
+  // assignments object on every change has been removed — patchAssignments now
+  // sends granular PATCH_ASSIGNMENT deltas instead. Newcomers still receive the
+  // full state via REQUEST_SYNC -> SYNC_STATE.
 
   useEffect(() => {
     if (!isRemoteUpdate.current && splitItems.length > 0 && step === AppStep.ASSIGN) {
-        broadcast({ 
-          type: 'SYNC_STATE', 
-          payload: { 
-            items: splitItems, 
-            people: stateRef.current.people, 
-            assignments: stateRef.current.assignments, 
-            step: stateRef.current.step 
-          } 
+        broadcast({
+          type: 'SYNC_STATE',
+          payload: {
+            items: splitItems,
+            people: stateRef.current.people,
+            assignments: stateRef.current.assignments,
+            step: stateRef.current.step
+          }
         });
     }
   }, [splitItems]);
@@ -178,8 +191,7 @@ export default function App() {
     setError(null);
     try {
       console.log('Enviando imagen al backend de AWS Lambda...');
-      
-      // Llamada al backend CORRECTO con el endpoint específico para base64
+
       const response = await fetch('https://hj22ziwwpjtkdgzpkdgi3ez7ii0ddtkj.lambda-url.eu-north-1.on.aws/api/ocr/base64', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -189,23 +201,21 @@ export default function App() {
       if (!response.ok) {
           throw new Error(`Error del servidor (${response.status}). Inténtalo de nuevo.`);
       }
-      
-      const data = await response.json();
-      console.log('Respuesta COMPLETA del backend:', data); 
 
-      // Intento robusto de encontrar los items
+      const data = await response.json();
+      console.log('Respuesta COMPLETA del backend:', data);
+
       let itemsArray = [];
       if (Array.isArray(data)) {
           itemsArray = data;
       } else if (data.structured_data && Array.isArray(data.structured_data.items)) {
-          // Caso específico para tu respuesta actual
           itemsArray = data.structured_data.items;
       } else if (data.items && Array.isArray(data.items)) {
           itemsArray = data.items;
       } else if (data.receipt && data.receipt.items && Array.isArray(data.receipt.items)) {
           itemsArray = data.receipt.items;
       }
-      
+
       if (!itemsArray || itemsArray.length === 0) {
           throw new Error("No se encontraron productos en el ticket. ¿Está borrosa la foto?");
       }
@@ -222,14 +232,14 @@ export default function App() {
       const flattened = flattenItems(items);
       setSplitItems(flattened);
       setLoadingItems(false);
-      
+
       broadcast({
         type: 'SYNC_STATE',
-        payload: { 
-          items: flattened, 
-          people: stateRef.current.people, 
-          assignments: {}, 
-          step: AppStep.PEOPLE 
+        payload: {
+          items: flattened,
+          people: stateRef.current.people,
+          assignments: {},
+          step: AppStep.PEOPLE
         }
       });
     } catch (err: any) {
@@ -244,7 +254,7 @@ export default function App() {
         try { clientRef.current.end(true); } catch (e) {}
         clientRef.current = null;
     }
-    
+
     const params = new URLSearchParams(window.location.search);
     params.set('session', newId);
     try {
@@ -343,28 +353,28 @@ export default function App() {
 
       <main className="flex-1 w-full max-w-3xl mx-auto relative overflow-hidden flex flex-col">
         {step === AppStep.UPLOAD && <StepUpload onImageSelected={handleImageSelected} onJoinSession={() => setShowJoinInput(true)} sessionId={sessionId} />}
-        
+
         {step === AppStep.PEOPLE && (
-          <StepPeople 
-            people={people} 
-            setPeople={setPeople} 
-            onNext={() => setStep(AppStep.ASSIGN)} 
+          <StepPeople
+            people={people}
+            setPeople={setPeople}
+            onNext={() => setStep(AppStep.ASSIGN)}
             isProcessingReceipt={loadingItems}
             receiptError={error}
             receiptThumbnail={receiptImage}
           />
         )}
-        
+
         {step === AppStep.ASSIGN && (
-          <StepAssign 
-            items={splitItems} 
+          <StepAssign
+            items={splitItems}
             setItems={setSplitItems}
-            people={people} 
-            assignments={assignments} 
-            setAssignments={setAssignments} 
-            onNext={() => setStep(AppStep.RESULTS)} 
-            sessionId={sessionId} 
-            peerCount={peerCount} 
+            people={people}
+            assignments={assignments}
+            patchAssignments={patchAssignments}
+            onNext={() => setStep(AppStep.RESULTS)}
+            sessionId={sessionId}
+            peerCount={peerCount}
           />
         )}
         {step === AppStep.RESULTS && <StepResults items={splitItems} people={people} assignments={assignments} onReset={handleReset} />}
