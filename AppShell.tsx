@@ -3,22 +3,37 @@ import { Loader2 } from 'lucide-react';
 import App from './App';
 import { HomeProjects } from './components/HomeProjects';
 import { ProjectDetail } from './components/ProjectDetail';
+import { ProjectPeopleStep } from './components/ProjectPeopleStep';
+import { LoginScreen } from './components/LoginScreen';
+import { JoinScreen } from './components/JoinScreen';
 import { useAuth } from './hooks/useAuth';
 import { Project } from './types';
 
 // Raíz de la app. Gestiona la sesión (identidad híbrida) y decide qué mostrar:
-//  - ?session=xxx  → wizard de ticket en vivo (links de invitación existentes).
-//  - resto         → "Mis proyectos", con acceso al reparto rápido (wizard) legacy.
+//  - ?session=xxx → wizard de ticket en vivo (links de invitación existentes).
+//  - ?join=xxx    → unirse a un proyecto por enlace y abrirlo.
+//  - resto        → login / "Mis proyectos" / detalle / reparto rápido.
 export default function AppShell() {
   const auth = useAuth();
   const [view, setView] = useState<'home' | 'quick'>('home');
   const [openProject, setOpenProject] = useState<Project | null>(null);
+  const [peopleStep, setPeopleStep] = useState(false);
+  const [pendingJoin, setPendingJoin] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('join'),
+  );
 
-  // Link de invitación a un reparto en vivo → directo al flujo actual, intacto.
   const hasLiveSession = useMemo(
     () => new URLSearchParams(window.location.search).has('session'),
     [],
   );
+
+  const stripJoin = () => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('join');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  };
+
   if (hasLiveSession) return <App />;
 
   if (auth.loading) {
@@ -30,13 +45,31 @@ export default function AppShell() {
     );
   }
 
+  // Sin sesión → pantalla de login (Google / email / probar sin cuenta).
+  if (!auth.session) return <LoginScreen auth={auth} />;
+
+  // Enlace de invitación ?join=<id> → pedir nombre y unirse.
+  if (pendingJoin) {
+    return (
+      <JoinScreen
+        projectId={pendingJoin}
+        auth={auth}
+        onJoined={p => { setOpenProject(p); setPeopleStep(false); setPendingJoin(null); stripJoin(); }}
+        onCancel={() => { setPendingJoin(null); stripJoin(); }}
+      />
+    );
+  }
+
   if (view === 'quick') return <App />;
 
   if (openProject) {
+    if (peopleStep) {
+      return <ProjectPeopleStep project={openProject} onDone={() => setPeopleStep(false)} />;
+    }
     return (
       <ProjectDetail
-        projectId={openProject.id}
-        projectName={openProject.name}
+        project={openProject}
+        myProfileId={auth.user?.id}
         onBack={() => setOpenProject(null)}
       />
     );
@@ -45,7 +78,7 @@ export default function AppShell() {
   return (
     <HomeProjects
       auth={auth}
-      onOpenProject={setOpenProject}
+      onOpenProject={(p, isNew = false) => { setOpenProject(p); setPeopleStep(isNew); }}
       onQuickSplit={() => setView('quick')}
     />
   );

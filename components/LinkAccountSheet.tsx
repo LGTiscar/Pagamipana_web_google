@@ -4,11 +4,14 @@ import { UseAuth } from '../hooks/useAuth';
 
 interface Props {
   auth: UseAuth;
+  // true si el usuario anónimo tiene datos que conservar → intentamos vincular
+  // (upgrade in-place). false → vamos directos a iniciar sesión (un solo prompt).
+  preserveData?: boolean;
   onClose: () => void;
 }
 
 // Modal para "ascender" un usuario anónimo a cuenta permanente (o iniciar sesión).
-export const LinkAccountSheet: React.FC<Props> = ({ auth, onClose }) => {
+export const LinkAccountSheet: React.FC<Props> = ({ auth, preserveData = false, onClose }) => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -26,12 +29,12 @@ export const LinkAccountSheet: React.FC<Props> = ({ auth, onClose }) => {
   };
 
   const submitGoogle = async () => {
-    const { error } = await auth.linkGoogle();
+    // Con datos que conservar → vincular (upgrade). Sin datos → iniciar sesión
+    // directa (evita el doble prompt de Google).
+    const { error } = preserveData ? await auth.linkGoogle() : await auth.signInGoogle();
     if (error) {
       setStatus('error');
-      setMessage(
-        'Google aún no está configurado en el proyecto. Usa el email por ahora.',
-      );
+      setMessage('Google aún no está configurado en el proyecto. Usa el email por ahora.');
     }
   };
 

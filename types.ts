@@ -103,6 +103,18 @@ export interface Participant {
   created_at: string;
 }
 
+// Resumen por proyecto para la home (mi saldo + avatares).
+export interface ProjectOverview {
+  id: string;
+  name: string;
+  type: ProjectType;
+  currency: string;
+  created_at: string;
+  my_net: number;
+  member_count: number;
+  avatars: { name: string; color: string | null }[];
+}
+
 export const PROJECT_TYPES: { value: ProjectType; label: string; emoji: string }[] = [
   { value: 'trip',    label: 'Viaje',  emoji: '✈️' },
   { value: 'couple',  label: 'Pareja', emoji: '💑' },
@@ -114,3 +126,52 @@ export const PROJECT_TYPES: { value: ProjectType; label: string; emoji: string }
 
 export const projectEmoji = (t: ProjectType): string =>
   PROJECT_TYPES.find(p => p.value === t)?.emoji ?? '📁';
+
+// ---------------------------------------------------------------------------
+// Gastos (fase 2) — dentro de un proyecto
+// ---------------------------------------------------------------------------
+export type SplitType = 'equal' | 'shares' | 'exact' | 'percent' | 'by_item';
+export type ExpenseSource = 'manual' | 'ocr';
+
+export interface Expense {
+  id: string;
+  project_id: string;
+  description: string;
+  amount_total: number;
+  currency: string;
+  paid_by: string;          // participant id
+  split_type: SplitType;
+  source: ExpenseSource;
+  receipt_path: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ExpenseShare {
+  id: string;
+  expense_id: string;
+  participant_id: string;
+  amount: number;           // importe resuelto que debe este participante
+}
+
+// Balance neto por participante (calculado en BD).
+export interface Balance {
+  participant_id: string;
+  display_name: string;
+  paid: number;
+  owed: number;
+  net: number;              // paid - owed  (>0 le deben, <0 debe)
+}
+
+export interface Settlement {
+  from: string;             // participant id que paga
+  to: string;               // participant id que cobra
+  amount: number;
+}
+
+export const SPLIT_TYPES: { value: SplitType; label: string }[] = [
+  { value: 'equal',   label: 'Igual' },
+  { value: 'shares',  label: 'Partes' },
+  { value: 'percent', label: '%' },
+  { value: 'exact',   label: 'Exacto' },
+];

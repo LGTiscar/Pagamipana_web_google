@@ -1,106 +1,260 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, Loader2, UserPlus } from 'lucide-react';
-import { Participant, AVATAR_COLORS } from '../types';
-import { listParticipants, addParticipant } from '../services/projects';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users } from 'lucide-react';
+import { Participant, Project, Expense, Balance, projectEmoji } from '../types';
+import { listParticipants, deleteProject } from '../services/projects';
+import { listExpenses, getBalances, deleteExpense, computeSettlements } from '../services/expenses';
+import { formatMoney } from '../services/format';
+import { AddExpenseSheet } from './AddExpenseSheet';
+import { InvitePanel } from './InvitePanel';
 
 interface Props {
-  projectId: string;
-  projectName?: string;
+  project: Project;
+  myProfileId?: string;
   onBack: () => void;
 }
 
 const initials = (name: string) => name.trim().charAt(0).toUpperCase() || '?';
 
-// Fase 1: cascarón navegable del proyecto — participantes + añadir a mano.
-// Los gastos y el balance llegan en la Fase 2.
-export const ProjectDetail: React.FC<Props> = ({ projectId, projectName, onBack }) => {
+export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack }) => {
+  const [tab, setTab] = useState<'gastos' | 'balances' | 'miembros'>('gastos');
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [balances, setBalances] = useState<Balance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState('');
-  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const cur = project.currency;
 
   const load = useCallback(async () => {
     try {
-      setParticipants(await listParticipants(projectId));
+      const [pa, ex, ba] = await Promise.all([
+        listParticipants(project.id),
+        listExpenses(project.id),
+        getBalances(project.id),
+      ]);
+      setParticipants(pa);
+      setExpenses(ex);
+      setBalances(ba);
     } catch (e: any) {
-      setError(e.message ?? 'No se pudieron cargar los participantes.');
+      setError(e.message ?? 'No se pudo cargar el proyecto.');
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [project.id]);
 
   useEffect(() => { load(); }, [load]);
 
-  const add = async () => {
-    if (!newName.trim()) return;
-    setAdding(true);
-    setError(null);
+  const nameOf = useCallback(
+    (pid: string) => participants.find(p => p.id === pid)?.display_name ?? '—',
+    [participants],
+  );
+  const colorOf = useCallback(
+    (pid: string) => participants.find(p => p.id === pid)?.color ?? 'bg-zinc-200 text-zinc-700',
+    [participants],
+  );
+
+  const myParticipant = useMemo(
+    () => participants.find(p => p.profile_id && p.profile_id === myProfileId),
+    [participants, myProfileId],
+  );
+  const myNet = balances.find(b => b.participant_id === myParticipant?.id)?.net ?? 0;
+  const settlements = useMemo(() => computeSettlements(balances), [balances]);
+  const maxAbs = useMemo(
+    () => Math.max(1, ...balances.map(b => Math.abs(b.net))),
+    [balances],
+  );
+
+  const removeExpense = async (id: string) => { await deleteExpense(id); await load(); };
+
+  const doDelete = async () => {
+    setDeleting(true);
     try {
-      const color = AVATAR_COLORS[participants.length % AVATAR_COLORS.length];
-      const p = await addParticipant(projectId, newName.trim(), color);
-      setParticipants(prev => [...prev, p]);
-      setNewName('');
+      await deleteProject(project.id);
+      onBack();
     } catch (e: any) {
-      setError(e.message ?? 'No se pudo añadir.');
-    } finally {
-      setAdding(false);
+      setError(e.message ?? 'No se pudo eliminar el proyecto.');
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-zinc-50">
-      <header className="px-4 pt-6 pb-4 flex items-center gap-3 shrink-0">
+    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100">
+    <div className="w-full max-w-md h-full flex flex-col bg-zinc-50 shadow-sm relative">
+      {/* Header */}
+      <header className="px-4 pt-6 pb-3 flex items-center gap-3 shrink-0">
         <button onClick={onBack} className="w-9 h-9 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-600 hover:text-zinc-900 active:scale-95">
           <ChevronLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold text-zinc-900 truncate">{projectName ?? 'Proyecto'}</h1>
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-5 pb-10 no-scrollbar">
-        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-3">Participantes</p>
-
-        {loading ? (
-          <div className="flex justify-center pt-8"><Loader2 className="animate-spin text-zinc-300" size={24} /></div>
-        ) : (
-          <div className="bg-white border border-zinc-200 rounded-2xl divide-y divide-zinc-100">
-            {participants.map(p => (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-3">
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>
-                  {initials(p.display_name)}
-                </span>
-                <span className="font-semibold text-zinc-900 flex-1">{p.display_name}</span>
-                {!p.profile_id && <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-1 rounded-full">sin cuenta</span>}
-              </div>
+        <div className="w-9 h-9 rounded-xl bg-white border border-zinc-100 flex items-center justify-center text-lg">{projectEmoji(project.type)}</div>
+        <h1 className="text-lg font-bold text-zinc-900 truncate flex-1">{project.name}</h1>
+        {!loading && participants.length > 0 && (
+          <div className="flex -space-x-2">
+            {participants.slice(0, 4).map(p => (
+              <span key={p.id} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-zinc-50 ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>{initials(p.display_name)}</span>
             ))}
-
-            <div className="flex items-center gap-2 px-4 py-3">
-              <span className="w-8 h-8 rounded-full border border-dashed border-blue-400 flex items-center justify-center text-blue-500"><UserPlus size={15} /></span>
-              <input
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && add()}
-                placeholder="Añadir a alguien sin la app"
-                className="flex-1 bg-transparent outline-none text-zinc-900 font-medium placeholder:text-zinc-400"
-              />
-              {newName.trim() && (
-                <button onClick={add} disabled={adding} className="text-blue-600 font-bold text-sm disabled:opacity-50">
-                  {adding ? '…' : 'Añadir'}
-                </button>
-              )}
-            </div>
           </div>
         )}
+      </header>
 
-        {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
-
-        {/* Placeholder honesto de lo que viene en Fase 2 */}
-        <div className="mt-6 border border-dashed border-zinc-200 rounded-2xl p-6 text-center">
-          <div className="text-3xl mb-2">🧾</div>
-          <p className="font-bold text-zinc-700">Gastos y balances</p>
-          <p className="text-sm text-zinc-400 mt-1">Próximamente: añade gastos (manual o por ticket) y mira quién debe a quién.</p>
+      {/* Balance band (en Gastos y Balances) */}
+      {!loading && tab !== 'miembros' && (
+        <div className="mx-4 mb-3 rounded-2xl px-4 py-3 shrink-0 bg-blue-50">
+          {Math.abs(myNet) < 0.01 ? (
+            <div className="text-blue-700 font-bold">Estás en paz 🎉</div>
+          ) : myNet > 0 ? (
+            <><div className="text-xs font-bold text-blue-700">En total, te deben</div>
+              <div className="text-2xl font-extrabold text-blue-700 tabular-nums">+{formatMoney(myNet, cur)}</div></>
+          ) : (
+            <><div className="text-xs font-bold text-red-500">En total, debes</div>
+              <div className="text-2xl font-extrabold text-red-500 tabular-nums">{formatMoney(myNet, cur)}</div></>
+          )}
         </div>
+      )}
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 pb-28 no-scrollbar">
+        {loading ? (
+          <div className="flex justify-center pt-10"><Loader2 className="animate-spin text-zinc-300" size={26} /></div>
+        ) : error ? (
+          <div className="text-center text-red-500 text-sm pt-8">{error}</div>
+        ) : tab === 'gastos' ? (
+          expenses.length === 0 ? (
+            <div className="text-center pt-14 px-6">
+              <div className="text-4xl mb-3">🧾</div>
+              <p className="font-bold text-zinc-900">Aún no hay gastos</p>
+              <p className="text-sm text-zinc-500 mt-1">Añade el primero con el botón +.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {expenses.map(e => (
+                <div key={e.id} className="group flex items-center gap-3 bg-white border border-zinc-200 rounded-2xl p-3">
+                  <div className="w-9 h-9 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-500 shrink-0">
+                    {e.source === 'ocr' ? <Receipt size={17} /> : <Pencil size={16} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-zinc-900 text-sm truncate">{e.description}</div>
+                    <div className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1.5">
+                      <span className={`text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${e.source === 'ocr' ? 'bg-blue-50 text-blue-600' : 'bg-zinc-100 text-zinc-500'}`}>
+                        {e.source === 'ocr' ? 'Ticket' : 'Manual'}
+                      </span>
+                      Pagó {nameOf(e.paid_by)}
+                    </div>
+                  </div>
+                  <div className="font-extrabold text-zinc-900 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
+                  <button onClick={() => removeExpense(e.id)} className="text-zinc-300 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
+                </div>
+              ))}
+            </div>
+          )
+        ) : tab === 'balances' ? (
+          <div>
+            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-2">Saldo de cada uno</div>
+            <div className="bg-white border border-zinc-200 rounded-2xl divide-y divide-zinc-100 mb-5">
+              {balances.map(b => {
+                const pct = Math.min(50, (Math.abs(b.net) / maxAbs) * 50);
+                return (
+                  <div key={b.participant_id} className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${colorOf(b.participant_id)}`}>{initials(b.display_name)}</span>
+                      <span className="flex-1 font-semibold text-zinc-900">{b.display_name}</span>
+                      <span className={`font-extrabold tabular-nums ${b.net > 0.005 ? 'text-blue-700' : b.net < -0.005 ? 'text-red-500' : 'text-zinc-400'}`}>
+                        {b.net > 0.005 ? '+' : ''}{formatMoney(b.net, cur)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-100 rounded-full mt-2 relative overflow-hidden">
+                      {b.net > 0.005 && <div className="absolute top-0 bottom-0 rounded-full bg-blue-500" style={{ left: '50%', width: `${pct}%` }} />}
+                      {b.net < -0.005 && <div className="absolute top-0 bottom-0 rounded-full bg-red-400" style={{ right: '50%', width: `${pct}%` }} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-2">
+              Cómo saldar {settlements.length > 0 && `· ${settlements.length} pago${settlements.length > 1 ? 's' : ''}`}
+            </div>
+            {settlements.length === 0 ? (
+              <div className="text-sm text-zinc-400 bg-white border border-zinc-200 rounded-2xl px-4 py-5 text-center">Todo cuadrado ✓</div>
+            ) : (
+              <div className="space-y-2">
+                {settlements.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-white border border-zinc-200 rounded-2xl px-3 py-3">
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${colorOf(s.from)}`}>{initials(nameOf(s.from))}</span>
+                    <span className="text-sm font-semibold text-zinc-800 flex-1">{nameOf(s.from)} <span className="text-zinc-300">→</span> {nameOf(s.to)}</span>
+                    <span className="font-extrabold text-zinc-900 tabular-nums">{formatMoney(s.amount, cur)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ---- Ajustes: invitar + gente + eliminar ---- */
+          <div>
+            <InvitePanel
+              project={project}
+              participants={participants}
+              onAdded={p => { setParticipants(prev => [...prev, p]); getBalances(project.id).then(setBalances).catch(() => {}); }}
+            />
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full mt-6 flex items-center justify-center gap-2 text-red-600 font-bold border border-red-200 bg-red-50 rounded-2xl py-3 hover:bg-red-100 transition-all"
+            >
+              <Trash2 size={16} /> Eliminar proyecto
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* FAB (solo en Gastos) */}
+      {tab === 'gastos' && !loading && (
+        <button
+          onClick={() => setShowAdd(true)}
+          className="absolute right-5 bottom-24 w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 hover:bg-blue-700 active:scale-95 transition-all"
+          aria-label="Nuevo gasto"
+        ><Plus size={28} /></button>
+      )}
+
+      {/* Bottom nav */}
+      <nav className="shrink-0 flex bg-white border-t border-zinc-100 px-2 pt-2 pb-5">
+        <button onClick={() => setTab('gastos')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'gastos' ? 'text-blue-600' : 'text-zinc-400'}`}>
+          <Receipt size={18} /> Gastos
+        </button>
+        <button onClick={() => setTab('balances')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'balances' ? 'text-blue-600' : 'text-zinc-400'}`}>
+          <Scale size={18} /> Balances
+        </button>
+        <button onClick={() => setTab('miembros')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'miembros' ? 'text-blue-600' : 'text-zinc-400'}`}>
+          <Users size={18} /> Miembros
+        </button>
+      </nav>
+
+      {showAdd && (
+        <AddExpenseSheet
+          projectId={project.id}
+          currency={cur}
+          participants={participants}
+          defaultPaidBy={myParticipant?.id}
+          onClose={() => setShowAdd(false)}
+          onAdded={() => { setShowAdd(false); load(); }}
+        />
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => !deleting && setConfirmDelete(false)}>
+          <div className="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900">¿Eliminar «{project.name}»?</h2>
+            <p className="text-sm text-zinc-500 mt-2">Se borrarán todos sus gastos y participantes. Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 text-zinc-700 disabled:opacity-50">Cancelar</button>
+              <button onClick={doDelete} disabled={deleting} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deleting ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
     </div>
   );
 };
