@@ -56,13 +56,13 @@ export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded })
   return (
     <>
       {/* Invitar por enlace / QR */}
-      <div className="bg-white border border-zinc-200 rounded-2xl p-5 text-center">
-        <div className="inline-flex p-2 bg-white rounded-xl border border-zinc-100">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 text-center">
+        <div className="inline-flex p-2 bg-white rounded-xl border border-zinc-200 dark:border-zinc-700">
           <QRCodeSVG value={inviteLink} size={124} bgColor="#ffffff" fgColor="#10131A" />
         </div>
-        <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 mt-4">
-          <span className="flex-1 text-xs text-zinc-500 font-medium truncate text-left">{inviteLink}</span>
-          <button onClick={copy} className="text-blue-600 font-bold text-xs flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 mt-4">
+          <span className="flex-1 text-xs text-zinc-500 dark:text-zinc-400 font-medium truncate text-left">{inviteLink}</span>
+          <button onClick={copy} className="text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center gap-1 shrink-0">
             {copied ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
           </button>
         </div>
@@ -72,13 +72,13 @@ export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded })
       </div>
 
       {/* Participantes */}
-      <div className="text-xs font-bold text-zinc-400 uppercase tracking-wide mt-6 mb-2">En el proyecto</div>
-      <div className="bg-white border border-zinc-200 rounded-2xl divide-y divide-zinc-100">
+      <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mt-6 mb-2">En el proyecto</div>
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl divide-y divide-zinc-100 dark:divide-zinc-800">
         {participants.map(p => (
           <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
             <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>{initials(p.display_name)}</span>
-            <span className="flex-1 font-semibold text-zinc-900 text-sm">{p.display_name}</span>
-            {!p.profile_id && <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">sin cuenta</span>}
+            <span className="flex-1 font-semibold text-zinc-900 dark:text-zinc-50 text-sm">{p.display_name}</span>
+            {!p.profile_id && <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">sin cuenta</span>}
           </div>
         ))}
         <div className="flex items-center gap-2 px-4 py-2.5">
@@ -88,13 +88,13 @@ export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded })
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && add()}
             placeholder="Añadir a alguien sin la app"
-            className="flex-1 bg-transparent outline-none text-zinc-900 font-medium text-sm placeholder:text-zinc-400"
+            className="flex-1 bg-transparent outline-none text-zinc-900 dark:text-zinc-50 font-medium text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
           />
-          {newName.trim() && <button onClick={add} disabled={adding} className="text-blue-600 font-bold text-sm disabled:opacity-50">{adding ? '…' : 'Añadir'}</button>}
+          {newName.trim() && <button onClick={add} disabled={adding} className="text-blue-600 dark:text-blue-400 font-bold text-sm disabled:opacity-50">{adding ? '…' : 'Añadir'}</button>}
         </div>
       </div>
-      <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Quien abra el enlace se une solo. Los que añadas a mano se reparten sus gastos aunque no tengan la app.</p>
-      {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+      <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2 leading-relaxed">Quien abra el enlace se une solo. Los que añadas a mano se reparten sus gastos aunque no tengan la app.</p>
+      {error && <p className="text-sm text-red-500 dark:text-red-400 mt-2">{error}</p>}
     </>
   );
 };

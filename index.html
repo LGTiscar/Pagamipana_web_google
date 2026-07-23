@@ -17,6 +17,17 @@
     <meta name="apple-mobile-web-app-title" content="PagaMiPana" />
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
+    <script>
+      // Aplica el tema antes de pintar para evitar parpadeo.
+      (function () {
+        try {
+          var t = localStorage.getItem('pmp-theme') || 'system';
+          var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {}
+      })();
+    </script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       
@@ -36,6 +47,9 @@
       .apple-bg {
         background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
         background-attachment: fixed;
+      }
+      html.dark body.apple-bg {
+        background: linear-gradient(135deg, #18181b 0%, #000000 100%);
       }
       
       @keyframes fade-in {
@@ -64,7 +78,7 @@
 }
 </script>
   </head>
-  <body class="apple-bg text-zinc-900 antialiased h-screen overflow-hidden">
+  <body class="apple-bg text-zinc-900 dark:text-zinc-50 antialiased h-screen overflow-hidden">
     <div id="root" class="h-full"></div>
     <script type="module" src="./index.tsx"></script>
   </body>

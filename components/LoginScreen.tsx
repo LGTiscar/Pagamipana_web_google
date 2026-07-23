@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { UseAuth } from '../hooks/useAuth';
+import { ThemeToggle } from './ThemeToggle';
 
 // Pantalla de onboarding / login (mockup 01). Identidad híbrida:
 // Google · email (magic-link) · "Probar sin cuenta" (anónimo).
@@ -27,36 +28,37 @@ export const LoginScreen: React.FC<{ auth: UseAuth }> = ({ auth }) => {
   };
 
   return (
-    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100">
-      <div className="w-full max-w-md h-full flex flex-col items-center justify-center bg-zinc-50 shadow-sm px-7">
+    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100 dark:bg-black">
+      <div className="relative w-full max-w-md h-full flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 shadow-sm px-7">
+        <ThemeToggle className="absolute top-5 right-5" />
         <div className="w-full max-w-[320px] flex flex-col items-center text-center">
           {/* Marca */}
           <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-3xl shadow-lg shadow-blue-600/40">🧾</div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 mt-4">PagaMiPana</h1>
-          <p className="text-zinc-500 leading-relaxed mt-2">Cuentas compartidas entre panas.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 mt-4">PagaMiPana</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mt-2">Cuentas compartidas entre panas.</p>
 
           {/* Acciones */}
           <div className="w-full mt-9">
             {mode === 'sent' ? (
               <div className="flex flex-col items-center text-center py-2">
                 <CheckCircle2 className="text-blue-600 mb-3" size={40} />
-                <p className="font-semibold text-zinc-900">Revisa tu correo</p>
-                <p className="text-sm text-zinc-500 mt-1">Te enviamos un enlace a <b>{email}</b> para entrar.</p>
+                <p className="font-semibold text-zinc-900 dark:text-zinc-50">Revisa tu correo</p>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Te enviamos un enlace a <b>{email}</b> para entrar.</p>
               </div>
             ) : mode === 'email' ? (
               <>
-                <button onClick={() => setMode('choices')} className="flex items-center gap-1 text-sm text-zinc-500 font-semibold mb-3">
+                <button onClick={() => setMode('choices')} className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400 font-semibold mb-3">
                   <ChevronLeft size={16} /> Volver
                 </button>
-                <div className="flex items-center gap-2 border border-zinc-200 rounded-2xl px-3 bg-white mb-3 focus-within:ring-2 focus-within:ring-blue-500">
-                  <Mail size={18} className="text-zinc-400" />
+                <div className="flex items-center gap-2 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 bg-white dark:bg-zinc-900 mb-3 focus-within:ring-2 focus-within:ring-blue-500">
+                  <Mail size={18} className="text-zinc-400 dark:text-zinc-500" />
                   <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && sendEmail()}
                     placeholder="tu@email.com"
-                    className="flex-1 py-3 bg-transparent outline-none font-medium text-zinc-900"
+                    className="flex-1 py-3 bg-transparent outline-none font-medium text-zinc-900 dark:text-zinc-50"
                     autoFocus
                   />
                 </div>
@@ -79,19 +81,19 @@ export const LoginScreen: React.FC<{ auth: UseAuth }> = ({ auth }) => {
                 </button>
                 <button
                   onClick={() => setMode('email')}
-                  className="w-full flex items-center justify-center gap-2 bg-white border border-zinc-200 text-zinc-800 rounded-2xl py-3.5 font-bold hover:bg-zinc-50 active:scale-[0.98] transition-all mb-3"
+                  className="w-full flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-100 rounded-2xl py-3.5 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition-all mb-3"
                 >
                   <Mail size={18} /> Continuar con email
                 </button>
-                <button onClick={auth.continueAsGuest} className="w-full text-blue-600 font-bold py-2">
+                <button onClick={auth.continueAsGuest} className="w-full text-blue-600 dark:text-blue-400 font-bold py-2">
                   Probar sin cuenta →
                 </button>
-                <p className="text-xs text-zinc-400 text-center mt-3 leading-relaxed">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-3 leading-relaxed">
                   Podrás vincular tu cuenta cuando quieras, sin perder tus proyectos.
                 </p>
               </>
             )}
-            {error && <p className="text-sm text-red-500 mt-3 text-center">{error}</p>}
+            {error && <p className="text-sm text-red-500 dark:text-red-400 mt-3 text-center">{error}</p>}
           </div>
         </div>
       </div>

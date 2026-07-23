@@ -62,10 +62,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   );
   const myNet = balances.find(b => b.participant_id === myParticipant?.id)?.net ?? 0;
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
-  const maxAbs = useMemo(
-    () => Math.max(1, ...balances.map(b => Math.abs(b.net))),
-    [balances],
-  );
+  const maxAbs = useMemo(() => Math.max(1, ...balances.map(b => Math.abs(b.net))), [balances]);
 
   const removeExpense = async (id: string) => { await deleteExpense(id); await load(); };
 
@@ -82,19 +79,19 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   };
 
   return (
-    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100">
-    <div className="w-full max-w-md h-full flex flex-col bg-zinc-50 shadow-sm relative">
+    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100 dark:bg-black">
+    <div className="w-full max-w-md h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 shadow-sm relative">
       {/* Header */}
       <header className="px-4 pt-6 pb-3 flex items-center gap-3 shrink-0">
-        <button onClick={onBack} className="w-9 h-9 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-600 hover:text-zinc-900 active:scale-95">
+        <button onClick={onBack} className="w-9 h-9 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white active:scale-95">
           <ChevronLeft size={20} />
         </button>
-        <div className="w-9 h-9 rounded-xl bg-white border border-zinc-100 flex items-center justify-center text-lg">{projectEmoji(project.type)}</div>
-        <h1 className="text-lg font-bold text-zinc-900 truncate flex-1">{project.name}</h1>
+        <div className="w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 flex items-center justify-center text-lg">{projectEmoji(project.type)}</div>
+        <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 truncate flex-1">{project.name}</h1>
         {!loading && participants.length > 0 && (
           <div className="flex -space-x-2">
             {participants.slice(0, 4).map(p => (
-              <span key={p.id} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-zinc-50 ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>{initials(p.display_name)}</span>
+              <span key={p.id} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-zinc-50 dark:ring-zinc-950 ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>{initials(p.display_name)}</span>
             ))}
           </div>
         )}
@@ -102,15 +99,15 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
 
       {/* Balance band (en Gastos y Balances) */}
       {!loading && tab !== 'miembros' && (
-        <div className="mx-4 mb-3 rounded-2xl px-4 py-3 shrink-0 bg-blue-50">
+        <div className="mx-4 mb-3 rounded-2xl px-4 py-3 shrink-0 bg-blue-50 dark:bg-blue-950/40">
           {Math.abs(myNet) < 0.01 ? (
-            <div className="text-blue-700 font-bold">Estás en paz 🎉</div>
+            <div className="text-blue-700 dark:text-blue-300 font-bold">Estás en paz 🎉</div>
           ) : myNet > 0 ? (
-            <><div className="text-xs font-bold text-blue-700">En total, te deben</div>
-              <div className="text-2xl font-extrabold text-blue-700 tabular-nums">+{formatMoney(myNet, cur)}</div></>
+            <><div className="text-xs font-bold text-blue-700 dark:text-blue-300">En total, te deben</div>
+              <div className="text-2xl font-extrabold text-blue-700 dark:text-blue-300 tabular-nums">+{formatMoney(myNet, cur)}</div></>
           ) : (
-            <><div className="text-xs font-bold text-red-500">En total, debes</div>
-              <div className="text-2xl font-extrabold text-red-500 tabular-nums">{formatMoney(myNet, cur)}</div></>
+            <><div className="text-xs font-bold text-red-500 dark:text-red-400">En total, debes</div>
+              <div className="text-2xl font-extrabold text-red-500 dark:text-red-400 tabular-nums">{formatMoney(myNet, cur)}</div></>
           )}
         </div>
       )}
@@ -118,54 +115,54 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-28 no-scrollbar">
         {loading ? (
-          <div className="flex justify-center pt-10"><Loader2 className="animate-spin text-zinc-300" size={26} /></div>
+          <div className="flex justify-center pt-10"><Loader2 className="animate-spin text-zinc-300 dark:text-zinc-600" size={26} /></div>
         ) : error ? (
-          <div className="text-center text-red-500 text-sm pt-8">{error}</div>
+          <div className="text-center text-red-500 dark:text-red-400 text-sm pt-8">{error}</div>
         ) : tab === 'gastos' ? (
           expenses.length === 0 ? (
             <div className="text-center pt-14 px-6">
               <div className="text-4xl mb-3">🧾</div>
-              <p className="font-bold text-zinc-900">Aún no hay gastos</p>
-              <p className="text-sm text-zinc-500 mt-1">Añade el primero con el botón +.</p>
+              <p className="font-bold text-zinc-900 dark:text-zinc-50">Aún no hay gastos</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Añade el primero con el botón +.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {expenses.map(e => (
-                <div key={e.id} className="group flex items-center gap-3 bg-white border border-zinc-200 rounded-2xl p-3">
-                  <div className="w-9 h-9 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-500 shrink-0">
+                <div key={e.id} className="group flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3">
+                  <div className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
                     {e.source === 'ocr' ? <Receipt size={17} /> : <Pencil size={16} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-zinc-900 text-sm truncate">{e.description}</div>
-                    <div className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1.5">
-                      <span className={`text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${e.source === 'ocr' ? 'bg-blue-50 text-blue-600' : 'bg-zinc-100 text-zinc-500'}`}>
+                    <div className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">{e.description}</div>
+                    <div className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1.5">
+                      <span className={`text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${e.source === 'ocr' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
                         {e.source === 'ocr' ? 'Ticket' : 'Manual'}
                       </span>
                       Pagó {nameOf(e.paid_by)}
                     </div>
                   </div>
-                  <div className="font-extrabold text-zinc-900 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
-                  <button onClick={() => removeExpense(e.id)} className="text-zinc-300 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
+                  <div className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
+                  <button onClick={() => removeExpense(e.id)} className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
                 </div>
               ))}
             </div>
           )
         ) : tab === 'balances' ? (
           <div>
-            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-2">Saldo de cada uno</div>
-            <div className="bg-white border border-zinc-200 rounded-2xl divide-y divide-zinc-100 mb-5">
+            <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-2">Saldo de cada uno</div>
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl divide-y divide-zinc-100 dark:divide-zinc-800 mb-5">
               {balances.map(b => {
                 const pct = Math.min(50, (Math.abs(b.net) / maxAbs) * 50);
                 return (
                   <div key={b.participant_id} className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${colorOf(b.participant_id)}`}>{initials(b.display_name)}</span>
-                      <span className="flex-1 font-semibold text-zinc-900">{b.display_name}</span>
-                      <span className={`font-extrabold tabular-nums ${b.net > 0.005 ? 'text-blue-700' : b.net < -0.005 ? 'text-red-500' : 'text-zinc-400'}`}>
+                      <span className="flex-1 font-semibold text-zinc-900 dark:text-zinc-50">{b.display_name}</span>
+                      <span className={`font-extrabold tabular-nums ${b.net > 0.005 ? 'text-blue-700 dark:text-blue-400' : b.net < -0.005 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
                         {b.net > 0.005 ? '+' : ''}{formatMoney(b.net, cur)}
                       </span>
                     </div>
-                    <div className="h-1.5 bg-zinc-100 rounded-full mt-2 relative overflow-hidden">
+                    <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full mt-2 relative overflow-hidden">
                       {b.net > 0.005 && <div className="absolute top-0 bottom-0 rounded-full bg-blue-500" style={{ left: '50%', width: `${pct}%` }} />}
                       {b.net < -0.005 && <div className="absolute top-0 bottom-0 rounded-full bg-red-400" style={{ right: '50%', width: `${pct}%` }} />}
                     </div>
@@ -174,25 +171,25 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
               })}
             </div>
 
-            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-2">
+            <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-2">
               Cómo saldar {settlements.length > 0 && `· ${settlements.length} pago${settlements.length > 1 ? 's' : ''}`}
             </div>
             {settlements.length === 0 ? (
-              <div className="text-sm text-zinc-400 bg-white border border-zinc-200 rounded-2xl px-4 py-5 text-center">Todo cuadrado ✓</div>
+              <div className="text-sm text-zinc-400 dark:text-zinc-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-5 text-center">Todo cuadrado ✓</div>
             ) : (
               <div className="space-y-2">
                 {settlements.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-white border border-zinc-200 rounded-2xl px-3 py-3">
+                  <div key={i} className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 py-3">
                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${colorOf(s.from)}`}>{initials(nameOf(s.from))}</span>
-                    <span className="text-sm font-semibold text-zinc-800 flex-1">{nameOf(s.from)} <span className="text-zinc-300">→</span> {nameOf(s.to)}</span>
-                    <span className="font-extrabold text-zinc-900 tabular-nums">{formatMoney(s.amount, cur)}</span>
+                    <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 flex-1">{nameOf(s.from)} <span className="text-zinc-300 dark:text-zinc-600">→</span> {nameOf(s.to)}</span>
+                    <span className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(s.amount, cur)}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
         ) : (
-          /* ---- Ajustes: invitar + gente + eliminar ---- */
+          /* ---- Miembros: invitar + gente + eliminar ---- */
           <div>
             <InvitePanel
               project={project}
@@ -201,7 +198,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             />
             <button
               onClick={() => setConfirmDelete(true)}
-              className="w-full mt-6 flex items-center justify-center gap-2 text-red-600 font-bold border border-red-200 bg-red-50 rounded-2xl py-3 hover:bg-red-100 transition-all"
+              className="w-full mt-6 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-bold border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 rounded-2xl py-3 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all"
             >
               <Trash2 size={16} /> Eliminar proyecto
             </button>
@@ -219,14 +216,14 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       )}
 
       {/* Bottom nav */}
-      <nav className="shrink-0 flex bg-white border-t border-zinc-100 px-2 pt-2 pb-5">
-        <button onClick={() => setTab('gastos')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'gastos' ? 'text-blue-600' : 'text-zinc-400'}`}>
+      <nav className="shrink-0 flex bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 px-2 pt-2 pb-5">
+        <button onClick={() => setTab('gastos')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'gastos' ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
           <Receipt size={18} /> Gastos
         </button>
-        <button onClick={() => setTab('balances')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'balances' ? 'text-blue-600' : 'text-zinc-400'}`}>
+        <button onClick={() => setTab('balances')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'balances' ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
           <Scale size={18} /> Balances
         </button>
-        <button onClick={() => setTab('miembros')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'miembros' ? 'text-blue-600' : 'text-zinc-400'}`}>
+        <button onClick={() => setTab('miembros')} className={`flex-1 flex flex-col items-center gap-1 text-[11px] font-bold ${tab === 'miembros' ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
           <Users size={18} /> Miembros
         </button>
       </nav>
@@ -243,12 +240,12 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => !deleting && setConfirmDelete(false)}>
-          <div className="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-zinc-900">¿Eliminar «{project.name}»?</h2>
-            <p className="text-sm text-zinc-500 mt-2">Se borrarán todos sus gastos y participantes. Esta acción no se puede deshacer.</p>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => !deleting && setConfirmDelete(false)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Eliminar «{project.name}»?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Se borrarán todos sus gastos y participantes. Esta acción no se puede deshacer.</p>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setConfirmDelete(false)} disabled={deleting} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 text-zinc-700 disabled:opacity-50">Cancelar</button>
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
               <button onClick={doDelete} disabled={deleting} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deleting ? 'Eliminando…' : 'Eliminar'}</button>
             </div>
           </div>

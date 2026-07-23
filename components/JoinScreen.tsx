@@ -31,19 +31,19 @@ export const JoinScreen: React.FC<Props> = ({ projectId, auth, onJoined, onCance
   };
 
   return (
-    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100">
-      <div className="w-full max-w-md h-full flex flex-col items-center justify-center bg-zinc-50 shadow-sm px-7">
+    <div className="h-[100dvh] w-full flex justify-center bg-zinc-100 dark:bg-black">
+      <div className="w-full max-w-md h-full flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 shadow-sm px-7">
         <div className="w-full max-w-[320px] text-center">
           <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-3xl shadow-lg shadow-blue-600/40 mx-auto">🎉</div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 mt-4">Te han invitado</h1>
-          <p className="text-zinc-500 leading-relaxed mt-2">¿Cómo te llamas? Así tus panas te reconocen en el grupo.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 mt-4">Te han invitado</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mt-2">¿Cómo te llamas? Así tus panas te reconocen en el grupo.</p>
 
           <input
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && join()}
             placeholder="Tu nombre"
-            className="w-full mt-6 px-4 py-3 rounded-2xl border border-zinc-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900 text-center"
+            className="w-full mt-6 px-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900 dark:text-zinc-50 text-center"
             autoFocus
           />
           <button
@@ -53,8 +53,8 @@ export const JoinScreen: React.FC<Props> = ({ projectId, auth, onJoined, onCance
           >
             {busy ? 'Uniéndote…' : 'Unirme al proyecto'}
           </button>
-          <button onClick={onCancel} className="w-full text-zinc-500 font-semibold py-3 mt-1">Ahora no</button>
-          {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+          <button onClick={onCancel} className="w-full text-zinc-500 dark:text-zinc-400 font-semibold py-3 mt-1">Ahora no</button>
+          {error && <p className="text-sm text-red-500 dark:text-red-400 mt-2">{error}</p>}
         </div>
       </div>
     </div>

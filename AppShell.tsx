@@ -38,9 +38,9 @@ export default function AppShell() {
 
   if (auth.loading) {
     return (
-      <div className="h-[100dvh] flex flex-col items-center justify-center bg-zinc-50">
+      <div className="h-[100dvh] flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <Loader2 className="w-9 h-9 text-blue-600 animate-spin" />
-        <p className="text-sm text-zinc-400 mt-3">Cargando…</p>
+        <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-3">Cargando…</p>
       </div>
     );
   }
