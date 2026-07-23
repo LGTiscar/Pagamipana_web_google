@@ -78,3 +78,39 @@ export const AVATAR_COLORS = [
   'bg-[#ffc6ff] text-zinc-900', // Mauve
   'bg-[#fffffc] text-zinc-900'  // Porcelain
 ];
+
+// ---------------------------------------------------------------------------
+// Proyectos (fase Tricount) — persistidos en Supabase
+// ---------------------------------------------------------------------------
+export type ProjectType = 'trip' | 'couple' | 'friends' | 'flat' | 'event' | 'other';
+
+export interface Project {
+  id: string;
+  name: string;
+  type: ProjectType;
+  currency: string;
+  created_by: string;
+  created_at: string;
+  archived_at: string | null;
+}
+
+export interface Participant {
+  id: string;
+  project_id: string;
+  profile_id: string | null; // null = participante "virtual" (sin cuenta)
+  display_name: string;
+  color: string | null;
+  created_at: string;
+}
+
+export const PROJECT_TYPES: { value: ProjectType; label: string; emoji: string }[] = [
+  { value: 'trip',    label: 'Viaje',  emoji: '✈️' },
+  { value: 'couple',  label: 'Pareja', emoji: '💑' },
+  { value: 'friends', label: 'Amigos', emoji: '🍻' },
+  { value: 'flat',    label: 'Piso',   emoji: '🏠' },
+  { value: 'event',   label: 'Evento', emoji: '🎉' },
+  { value: 'other',   label: 'Otro',   emoji: '📁' },
+];
+
+export const projectEmoji = (t: ProjectType): string =>
+  PROJECT_TYPES.find(p => p.value === t)?.emoji ?? '📁';

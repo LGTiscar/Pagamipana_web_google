@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "*",
+    "@supabase/supabase-js": "^2.110.8",
     "heic2any": "^0.0.4",
     "lucide-react": "^0.460.0",
     "mqtt": "^5.10.0",
