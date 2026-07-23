@@ -34,11 +34,11 @@ export const ItemAssigner: React.FC<Props> = ({ people, lines, setLines, currenc
     setEditingId(null);
   };
 
-  const avatar = (pid: string, name: string, on: boolean, onClick: () => void, offsetDark = 'zinc-900') => (
+  const avatar = (pid: string, name: string, on: boolean, onClick: () => void, offsetClass = 'dark:ring-offset-zinc-900') => (
     <button
       onClick={onClick}
       title={name}
-      className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${colorOf(pid)} ${on ? `ring-2 ring-blue-600 ring-offset-1 ring-offset-white dark:ring-offset-${offsetDark}` : 'opacity-30'}`}
+      className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${colorOf(pid)} ${on ? `ring-2 ring-blue-600 ring-offset-1 ring-offset-white ${offsetClass}` : 'opacity-30'}`}
     >{initials(name)}</button>
   );
 
@@ -127,7 +127,7 @@ export const ItemAssigner: React.FC<Props> = ({ people, lines, setLines, currenc
                       </span>
                     </div>
                     <div className="flex gap-2 flex-wrap">
-                      {people.map(p => avatar(p.id, p.name, uOwners.includes(p.id), () => update(l.id, x => toggleUnit(x, idx, p.id)), 'zinc-800'))}
+                      {people.map(p => avatar(p.id, p.name, uOwners.includes(p.id), () => update(l.id, x => toggleUnit(x, idx, p.id)), 'dark:ring-offset-zinc-800'))}
                     </div>
                   </div>
                 ))}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PagaMiPana</string>
+    <string name="title_activity_main">PagaMiPana</string>
+    <string name="package_name">com.pagamipana.app</string>
+    <string name="custom_url_scheme">com.pagamipana.app</string>
+</resources>

@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos que antes estaban inline en index.html (vía Tailwind CDN). */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.apple-bg {
+  background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+  background-attachment: fixed;
+}
+html.dark body.apple-bg {
+  background: linear-gradient(135deg, #18181b 0%, #000000 100%);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
