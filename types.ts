@@ -6,7 +6,7 @@ export interface ReceiptItem {
   originalIndex: number; // To keep order
 }
 
-// A flattened item represents a single unit of a line item. 
+// A flattened item represents a single unit of a line item.
 // E.g., "2x Beers" becomes 2 FlattenedItems.
 export interface SplitItem {
   id: string;
@@ -35,6 +35,35 @@ export enum AppStep {
   ASSIGN = 'ASSIGN',
   RESULTS = 'RESULTS',
 }
+
+// Sync types for MQTT
+export type SyncPayload =
+  | {
+      type: 'SYNC_STATE';
+      payload: {
+        items: SplitItem[];
+        people: Person[];
+        assignments: Assignment;
+        step: AppStep;
+      };
+    }
+  | {
+      type: 'UPDATE_ASSIGNMENTS';
+      payload: Assignment;
+    }
+  // Delta sync: only the changed unit keys travel. Merged with `...prev` on
+  // receipt, so simultaneous edits to *different* lines don't clobber each other.
+  | {
+      type: 'PATCH_ASSIGNMENT';
+      payload: Assignment;
+    }
+  | {
+      type: 'UPDATE_PEOPLE';
+      payload: Person[];
+    }
+  | {
+      type: 'REQUEST_SYNC';
+    };
 
 // Custom pastel palette from user request
 // All backgrounds are light, so we use dark text (zinc-900) for contrast

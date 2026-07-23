@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Share2, Wallet, ArrowRight, Receipt } from 'lucide-react';
+import { RefreshCw, Share2, ArrowRight } from 'lucide-react';
 import { Button } from './Button';
 import { SplitItem, Person, Assignment } from '../types';
+import { Logo } from './Logo';
 
 interface StepResultsProps {
   items: SplitItem[];
@@ -105,7 +106,7 @@ export const StepResults: React.FC<StepResultsProps> = ({
                   <h2 className="text-4xl font-extrabold text-black mt-1">{formatPrice(grandTotal)}</h2>
                </div>
                <div className="p-3 bg-zinc-100 rounded-2xl text-black">
-                  <Receipt size={24} />
+                  <Logo size={24} />
                </div>
            </div>
            
