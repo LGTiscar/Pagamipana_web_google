@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera } from 'lucide-react';
 import { Participant, Project, Expense, Balance, projectEmoji } from '../types';
 import { listParticipants, deleteProject } from '../services/projects';
-import { listExpenses, getBalances, deleteExpense, computeSettlements } from '../services/expenses';
+import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement } from '../services/expenses';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
 import { ScanExpenseSheet } from './ScanExpenseSheet';
@@ -28,6 +28,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [fabOpen, setFabOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [settlingIdx, setSettlingIdx] = useState<number | null>(null);
 
   const cur = project.currency;
 
@@ -68,6 +69,18 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const maxAbs = useMemo(() => Math.max(1, ...balances.map(b => Math.abs(b.net))), [balances]);
 
   const removeExpense = async (id: string) => { await deleteExpense(id); await load(); };
+
+  const markPaid = async (s: { from: string; to: string; amount: number }, idx: number) => {
+    setSettlingIdx(idx);
+    try {
+      await recordSettlement(project.id, s.from, s.to, s.amount);
+      setBalances(await getBalances(project.id));
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo registrar el pago.');
+    } finally {
+      setSettlingIdx(null);
+    }
+  };
 
   const doDelete = async () => {
     setDeleting(true);
@@ -184,8 +197,13 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                 {settlements.map((s, i) => (
                   <div key={i} className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 py-3">
                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${colorOf(s.from)}`}>{initials(nameOf(s.from))}</span>
-                    <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 flex-1">{nameOf(s.from)} <span className="text-zinc-300 dark:text-zinc-600">→</span> {nameOf(s.to)}</span>
+                    <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 flex-1 min-w-0 truncate">{nameOf(s.from)} <span className="text-zinc-300 dark:text-zinc-600">→</span> {nameOf(s.to)}</span>
                     <span className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(s.amount, cur)}</span>
+                    <button
+                      onClick={() => markPaid(s, i)}
+                      disabled={settlingIdx === i}
+                      className="ml-1 shrink-0 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full px-3 py-1.5 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-950 disabled:opacity-50"
+                    >{settlingIdx === i ? '…' : 'Pagado'}</button>
                   </div>
                 ))}
               </div>

@@ -12,8 +12,8 @@ export async function listProjects(): Promise<Project[]> {
 }
 
 // Resumen para la home: por proyecto, mi saldo neto, nº de gente y avatares.
-export async function listProjectsOverview(): Promise<ProjectOverview[]> {
-  const { data, error } = await supabase.rpc('list_projects_overview');
+export async function listProjectsOverview(includeArchived = false): Promise<ProjectOverview[]> {
+  const { data, error } = await supabase.rpc('list_projects_overview', { p_include_archived: includeArchived });
   if (error) throw error;
   return (data ?? []).map((r: any) => ({
     id: r.id,
@@ -21,10 +21,20 @@ export async function listProjectsOverview(): Promise<ProjectOverview[]> {
     type: r.type,
     currency: r.currency,
     created_at: r.created_at,
+    archived_at: r.archived_at ?? null,
     my_net: Number(r.my_net),
     member_count: Number(r.member_count),
     avatars: r.avatars ?? [],
   })) as ProjectOverview[];
+}
+
+// Archiva / desarchiva un proyecto (RLS: solo miembros).
+export async function archiveProject(id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('projects')
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // Crea el proyecto y añade al creador como participante (RPC atómico, evita el

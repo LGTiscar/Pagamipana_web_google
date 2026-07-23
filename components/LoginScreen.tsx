@@ -5,7 +5,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 // Pantalla de onboarding / login (mockup 01). Identidad híbrida:
 // Google · email (magic-link) · "Probar sin cuenta" (anónimo).
-export const LoginScreen: React.FC<{ auth: UseAuth }> = ({ auth }) => {
+export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> = ({ auth, onQuickSplit }) => {
   const [mode, setMode] = useState<'choices' | 'email' | 'sent'>('choices');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,6 +91,15 @@ export const LoginScreen: React.FC<{ auth: UseAuth }> = ({ auth }) => {
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-3 leading-relaxed">
                   Podrás vincular tu cuenta cuando quieras, sin perder tus proyectos.
                 </p>
+
+                <div className="flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-semibold">o solo un ticket</span>
+                  <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+                </div>
+                <button onClick={onQuickSplit} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white py-2">
+                  🧾 Reparto rápido, sin cuenta
+                </button>
               </>
             )}
             {error && <p className="text-sm text-red-500 dark:text-red-400 mt-3 text-center">{error}</p>}

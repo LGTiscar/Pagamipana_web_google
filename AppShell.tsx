@@ -6,6 +6,7 @@ import { ProjectDetail } from './components/ProjectDetail';
 import { ProjectPeopleStep } from './components/ProjectPeopleStep';
 import { LoginScreen } from './components/LoginScreen';
 import { JoinScreen } from './components/JoinScreen';
+import { QuickSplit } from './components/QuickSplit';
 import { useAuth } from './hooks/useAuth';
 import { Project } from './types';
 
@@ -15,7 +16,7 @@ import { Project } from './types';
 //  - resto        → login / "Mis proyectos" / detalle / reparto rápido.
 export default function AppShell() {
   const auth = useAuth();
-  const [view, setView] = useState<'home' | 'quick'>('home');
+  const [quickMode, setQuickMode] = useState(false);
   const [openProject, setOpenProject] = useState<Project | null>(null);
   const [peopleStep, setPeopleStep] = useState(false);
   const [pendingJoin, setPendingJoin] = useState<string | null>(
@@ -45,8 +46,11 @@ export default function AppShell() {
     );
   }
 
+  // Reparto rápido sin cuenta ni proyecto (efímero), accesible desde el login.
+  if (quickMode) return <QuickSplit onExit={() => setQuickMode(false)} />;
+
   // Sin sesión → pantalla de login (Google / email / probar sin cuenta).
-  if (!auth.session) return <LoginScreen auth={auth} />;
+  if (!auth.session) return <LoginScreen auth={auth} onQuickSplit={() => setQuickMode(true)} />;
 
   // Enlace de invitación ?join=<id> → pedir nombre y unirse.
   if (pendingJoin) {
@@ -59,8 +63,6 @@ export default function AppShell() {
       />
     );
   }
-
-  if (view === 'quick') return <App />;
 
   if (openProject) {
     if (peopleStep) {
@@ -79,7 +81,6 @@ export default function AppShell() {
     <HomeProjects
       auth={auth}
       onOpenProject={(p, isNew = false) => { setOpenProject(p); setPeopleStep(isNew); }}
-      onQuickSplit={() => setView('quick')}
     />
   );
 }

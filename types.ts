@@ -110,6 +110,7 @@ export interface ProjectOverview {
   type: ProjectType;
   currency: string;
   created_at: string;
+  archived_at: string | null;
   my_net: number;
   member_count: number;
   avatars: { name: string; color: string | null }[];

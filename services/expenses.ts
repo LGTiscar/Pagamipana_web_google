@@ -59,6 +59,22 @@ export async function deleteExpense(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Registra un pago entre participantes (liquidación). Reduce la deuda.
+export async function recordSettlement(
+  projectId: string,
+  fromParticipant: string,
+  toParticipant: string,
+  amount: number,
+): Promise<void> {
+  const { error } = await supabase.from('settlements').insert({
+    project_id: projectId,
+    from_participant: fromParticipant,
+    to_participant: toParticipant,
+    amount,
+  });
+  if (error) throw error;
+}
+
 export async function getBalances(projectId: string): Promise<Balance[]> {
   const { data, error } = await supabase.rpc('get_balances', { p_project_id: projectId });
   if (error) throw error;
