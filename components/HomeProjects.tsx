@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Loader2, ScanLine, LogOut } from 'lucide-react';
+import { Plus, Loader2, ScanLine, LogOut, MoreVertical, Trash2, Archive } from 'lucide-react';
 import { Project, ProjectOverview, projectEmoji } from '../types';
-import { listProjectsOverview } from '../services/projects';
+import { listProjectsOverview, deleteProject } from '../services/projects';
 import { formatMoney } from '../services/format';
 import { UseAuth } from '../hooks/useAuth';
 import { CreateProjectSheet } from './CreateProjectSheet';
@@ -28,6 +28,24 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSpli
   const [showCreate, setShowCreate] = useState(false);
   const [showLink, setShowLink] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectOverview | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const doDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteProject(deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo eliminar el proyecto.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,12 +75,21 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSpli
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {auth.isAnonymous ? (
-            <button
-              onClick={() => setShowLink(true)}
-              className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-bold px-3 py-2 rounded-full hover:border-zinc-300"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" /> Vincular cuenta
-            </button>
+            <>
+              <button
+                onClick={() => setShowLink(true)}
+                className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-bold px-3 py-2 rounded-full hover:border-zinc-300"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" /> Vincular cuenta
+              </button>
+              <button
+                onClick={() => setConfirmSignOut(true)}
+                title="Cerrar sesión" aria-label="Cerrar sesión"
+                className="w-9 h-9 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-red-500 active:scale-95"
+              >
+                <LogOut size={15} />
+              </button>
+            </>
           ) : (
             <div className="relative">
               <button onClick={() => setShowMenu(v => !v)} className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold active:scale-95">
@@ -119,10 +146,10 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSpli
               const pos = o.my_net > 0.005;
               const neg = o.my_net < -0.005;
               return (
-                <button
+                <div
                   key={o.id}
                   onClick={() => onOpenProject(toProject(o))}
-                  className="w-full text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all active:scale-[0.99]"
+                  className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
@@ -132,11 +159,18 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSpli
                         <div className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{o.member_count} {o.member_count === 1 ? 'persona' : 'personas'}</div>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-[11px] font-semibold text-zinc-400 dark:text-zinc-500">{pos ? 'Te deben' : neg ? 'Le debes' : 'En paz'}</div>
-                      <div className={`text-base font-extrabold tabular-nums ${pos ? 'text-blue-700 dark:text-blue-400' : neg ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
-                        {Math.abs(o.my_net) < 0.005 ? '✓' : `${pos ? '+' : ''}${formatMoney(o.my_net, o.currency)}`}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <div className="text-right">
+                        <div className="text-[11px] font-semibold text-zinc-400 dark:text-zinc-500">{pos ? 'Te deben' : neg ? 'Le debes' : 'En paz'}</div>
+                        <div className={`text-base font-extrabold tabular-nums ${pos ? 'text-blue-700 dark:text-blue-400' : neg ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                          {Math.abs(o.my_net) < 0.005 ? '✓' : `${pos ? '+' : ''}${formatMoney(o.my_net, o.currency)}`}
+                        </div>
                       </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); setMenuFor(menuFor === o.id ? null : o.id); }}
+                        className="w-8 h-8 -mr-1 rounded-full flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        aria-label="Opciones del proyecto"
+                      ><MoreVertical size={18} /></button>
                     </div>
                   </div>
                   {o.avatars.length > 0 && (
@@ -146,7 +180,21 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSpli
                       ))}
                     </div>
                   )}
-                </button>
+                  {menuFor === o.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={e => { e.stopPropagation(); setMenuFor(null); }} />
+                      <div className="absolute right-3 top-14 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl z-20 overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <button disabled className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-zinc-400 dark:text-zinc-600 cursor-not-allowed">
+                          <span className="flex items-center gap-2"><Archive size={16} /> Archivar</span>
+                          <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 rounded-full px-2 py-0.5">pronto</span>
+                        </button>
+                        <button onClick={() => { setMenuFor(null); setDeleteTarget(o); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border-t border-zinc-100 dark:border-zinc-800">
+                          <Trash2 size={16} /> Eliminar proyecto
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -181,6 +229,32 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSpli
         />
       )}
       {showLink && <LinkAccountSheet auth={auth} preserveData={projects.length > 0} onClose={() => setShowLink(false)} />}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Eliminar «{deleteTarget.name}»?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Se borrarán todos sus gastos y participantes. Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={doDelete} disabled={deleting} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deleting ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmSignOut && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setConfirmSignOut(false)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Cerrar sesión?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Estás como invitado. Perderás el acceso a los proyectos creados, salvo que <b>vincules una cuenta</b> antes.</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirmSignOut(false)} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200">Cancelar</button>
+              <button onClick={async () => { setConfirmSignOut(false); await auth.signOut(); }} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </div>
   );

@@ -33,6 +33,27 @@ export async function addExpense(input: {
   return data as Expense;
 }
 
+// Gasto por ticket (OCR): crea el gasto + shares + líneas del ticket.
+export async function addOcrExpense(input: {
+  projectId: string;
+  description: string;
+  amount: number;
+  paidBy: string;
+  shares: { participant_id: string; amount: number }[];
+  items: { description: string; quantity: number; unit_price: number; owner_ids: string[] }[];
+}): Promise<Expense> {
+  const { data, error } = await supabase.rpc('add_ocr_expense', {
+    p_project_id: input.projectId,
+    p_description: input.description,
+    p_amount: input.amount,
+    p_paid_by: input.paidBy,
+    p_shares: input.shares,
+    p_items: input.items,
+  });
+  if (error) throw error;
+  return data as Expense;
+}
+
 export async function deleteExpense(id: string): Promise<void> {
   const { error } = await supabase.from('expenses').delete().eq('id', id);
   if (error) throw error;

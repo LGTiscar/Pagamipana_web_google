@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera } from 'lucide-react';
 import { Participant, Project, Expense, Balance, projectEmoji } from '../types';
 import { listParticipants, deleteProject } from '../services/projects';
 import { listExpenses, getBalances, deleteExpense, computeSettlements } from '../services/expenses';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
+import { ScanExpenseSheet } from './ScanExpenseSheet';
 import { InvitePanel } from './InvitePanel';
 
 interface Props {
@@ -23,6 +24,8 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showScan, setShowScan] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -206,13 +209,30 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
         )}
       </div>
 
-      {/* FAB (solo en Gastos) */}
+      {/* FAB con menú (solo en Gastos) */}
       {tab === 'gastos' && !loading && (
-        <button
-          onClick={() => setShowAdd(true)}
-          className="absolute right-5 bottom-24 w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 hover:bg-blue-700 active:scale-95 transition-all"
-          aria-label="Nuevo gasto"
-        ><Plus size={28} /></button>
+        <>
+          {fabOpen && <div className="absolute inset-0 z-30" onClick={() => setFabOpen(false)} />}
+          <div className="absolute right-5 bottom-24 z-40 flex flex-col items-end gap-2.5">
+            {fabOpen && (
+              <>
+                <button onClick={() => { setFabOpen(false); setShowScan(true); }} className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 font-bold text-sm rounded-full pl-4 pr-2 py-2 shadow-lg animate-fade-in">
+                  Escanear ticket
+                  <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center"><Camera size={16} /></span>
+                </button>
+                <button onClick={() => { setFabOpen(false); setShowAdd(true); }} className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 font-bold text-sm rounded-full pl-4 pr-2 py-2 shadow-lg animate-fade-in">
+                  Gasto manual
+                  <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center"><Pencil size={15} /></span>
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setFabOpen(v => !v)}
+              className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 hover:bg-blue-700 active:scale-95 transition-all"
+              aria-label="Añadir gasto"
+            ><Plus size={28} className={`transition-transform ${fabOpen ? 'rotate-45' : ''}`} /></button>
+          </div>
+        </>
       )}
 
       {/* Bottom nav */}
@@ -236,6 +256,17 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
           defaultPaidBy={myParticipant?.id}
           onClose={() => setShowAdd(false)}
           onAdded={() => { setShowAdd(false); load(); }}
+        />
+      )}
+
+      {showScan && (
+        <ScanExpenseSheet
+          projectId={project.id}
+          currency={cur}
+          participants={participants}
+          defaultPaidBy={myParticipant?.id}
+          onClose={() => setShowScan(false)}
+          onAdded={() => { setShowScan(false); load(); }}
         />
       )}
 
