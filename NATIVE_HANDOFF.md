@@ -84,6 +84,20 @@ En **app nativa** el origin es `http://localhost` (o `capacitor://localhost`), a
 
 ---
 
+## Login con Apple (opcional, recomendado para iOS)
+El código ya incluye **"Continuar con Apple"** (login y vincular cuenta), **oculto** tras el flag
+`VITE_ENABLE_APPLE_LOGIN`. Para activarlo:
+1. **Apple Developer** (cuenta de pago): crea un **App ID** con *Sign in with Apple*, un **Services ID**
+   (para web/OAuth) y una **Key** de Sign in with Apple. Return URL del Services ID:
+   `https://jrosaurwxncfjpvquzzy.supabase.co/auth/v1/callback`.
+2. **Supabase → Authentication → Providers → Apple**: activa y rellena Services ID (client_id), Team ID,
+   Key ID y la clave privada `.p8` (secret).
+3. **Frontend**: `VITE_ENABLE_APPLE_LOGIN=true` en `.env.production` (y `.env.local` para probar) → aparece el botón.
+
+> - App Store: si ofreces login social (Google) en iOS, Apple **exige** ofrecer también *Sign in with Apple*.
+> - Apple es OAuth → **no pasa por captcha** (vía a prueba de bloqueadores).
+> - En **nativo** necesita los mismos **deep-links** que Google (ver arriba); en **web** va con el redirect estándar.
+
 ## Otros pendientes nativos
 - **Iconos y splash**: generar con `@capacitor/assets` a partir de un logo de origen.
 - **Cámara nativa** (opcional): migrar el OCR de `<input capture>` a `@capacitor/camera` para mejor UX.

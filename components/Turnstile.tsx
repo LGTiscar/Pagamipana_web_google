@@ -1,9 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
 // CAPTCHA de Cloudflare Turnstile, activo solo si hay VITE_TURNSTILE_SITE_KEY.
-// Si no hay clave, no renderiza nada y la auth funciona sin captcha (útil en dev
-// si en Supabase no está activado). En dev con captcha activo, usa la SITE KEY de
-// prueba de Cloudflare (1x00000000000000000000AA) en .env.local.
+// Si no hay clave, no renderiza nada y la auth funciona sin captcha.
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 const SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
@@ -25,14 +23,21 @@ function loadScript(): Promise<void> {
   return scriptPromise;
 }
 
-// onToken se llama con el token al resolverse, o con '' si expira.
-export const Turnstile: React.FC<{ onToken: (t: string) => void }> = ({ onToken }) => {
+// onToken se llama con el token al resolverse (o '' si expira).
+// onError se llama si el desafío falla o no se completa a tiempo (p. ej. lo
+// bloquea una extensión / cookies de terceros) → la UI ofrece Google + reintento.
+export const Turnstile: React.FC<{ onToken: (t: string) => void; onError?: () => void }> = ({ onToken, onError }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!SITE_KEY) return;
     let cancelled = false;
+    let solved = false;
     let widgetId: string | undefined;
+
+    // Si en 10s no se ha resuelto, asumimos que el entorno lo bloquea.
+    const timer = window.setTimeout(() => { if (!solved && !cancelled) onError?.(); }, 10000);
+
     loadScript()
       .then(() => {
         if (cancelled || !ref.current) return;
@@ -40,14 +45,18 @@ export const Turnstile: React.FC<{ onToken: (t: string) => void }> = ({ onToken 
         widgetId = ts.render(ref.current, {
           sitekey: SITE_KEY,
           theme: 'auto',
-          callback: (token: string) => onToken(token),
+          retry: 'auto',
+          'retry-interval': 3000,
+          callback: (token: string) => { solved = true; window.clearTimeout(timer); onToken(token); },
           'expired-callback': () => onToken(''),
-          'error-callback': () => onToken(''),
+          'error-callback': (code: string) => { console.warn('[Turnstile] error', code); onError?.(); return true; },
         });
       })
-      .catch(() => {});
+      .catch(() => { onError?.(); });
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
       if (widgetId && (window as any).turnstile) {
         try { (window as any).turnstile.remove(widgetId); } catch { /* noop */ }
       }

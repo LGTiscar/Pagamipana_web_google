@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Mail, CheckCircle2 } from 'lucide-react';
 import { UseAuth } from '../hooks/useAuth';
+import { AppleLogo, appleEnabled } from './AppleLogo';
 
 interface Props {
   auth: UseAuth;
@@ -30,6 +31,14 @@ export const LinkAccountSheet: React.FC<Props> = ({ auth, preserveData = false, 
     }
   };
 
+  const submitApple = async () => {
+    const { error } = preserveData ? await auth.linkApple() : await auth.signInApple();
+    if (error) {
+      setStatus('error');
+      setMessage('No se pudo continuar con Apple. Prueba con Google o email.');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
@@ -56,6 +65,14 @@ export const LinkAccountSheet: React.FC<Props> = ({ auth, preserveData = false, 
               <span className="w-5 h-5 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-[13px] font-bold text-[#4285F4]">G</span>
               Continuar con Google
             </button>
+            {appleEnabled && (
+              <button
+                onClick={submitApple}
+                className="w-full flex items-center justify-center gap-2 bg-black text-white dark:bg-white dark:text-black rounded-2xl py-3.5 font-bold active:scale-[0.98] transition-all mb-3"
+              >
+                <AppleLogo size={17} /> Continuar con Apple
+              </button>
+            )}
 
             <div className="relative flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-zinc-100 dark:bg-zinc-800" />

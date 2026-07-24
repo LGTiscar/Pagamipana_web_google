@@ -3,6 +3,7 @@ import { Mail, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { UseAuth } from '../hooks/useAuth';
 import { ThemeToggle } from './ThemeToggle';
 import { Turnstile, captchaEnabled } from './Turnstile';
+import { AppleLogo, appleEnabled } from './AppleLogo';
 
 // Pantalla de onboarding / login (mockup 01). Identidad híbrida:
 // Google · email (magic-link) · "Probar sin cuenta" (anónimo).
@@ -12,12 +13,38 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaError, setCaptchaError] = useState(false);
+  const [captchaKey, setCaptchaKey] = useState(0);
   const captchaMissing = captchaEnabled && !captchaToken;
+  const retryCaptcha = () => { setCaptchaError(false); setCaptchaToken(''); setCaptchaKey(k => k + 1); };
+
+  const captchaBlock = captchaEnabled ? (
+    <>
+      <Turnstile
+        key={captchaKey}
+        onToken={t => { setCaptchaToken(t); setCaptchaError(false); }}
+        onError={() => setCaptchaError(true)}
+      />
+      {captchaError && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center -mt-1 mb-3 leading-relaxed">
+          No se pudo cargar la verificación (¿un bloqueador o extensión?). Puedes entrar con <b>Google</b>,
+          desactivar el bloqueador para este sitio, o{' '}
+          <button onClick={retryCaptcha} className="text-blue-600 dark:text-blue-400 font-semibold underline">reintentar</button>.
+        </p>
+      )}
+    </>
+  ) : null;
 
   const google = async () => {
     setError(null);
     const { error } = await auth.signInGoogle();
     if (error) setError('No se pudo iniciar sesión con Google.');
+  };
+
+  const apple = async () => {
+    setError(null);
+    const { error } = await auth.signInApple();
+    if (error) setError('No se pudo iniciar sesión con Apple.');
   };
 
   const sendEmail = async () => {
@@ -74,7 +101,7 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
                     autoFocus
                   />
                 </div>
-                <Turnstile onToken={setCaptchaToken} />
+                {captchaBlock}
                 <button
                   onClick={sendEmail}
                   disabled={!email.trim() || busy || captchaMissing}
@@ -92,13 +119,21 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
                   <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[13px] font-bold text-[#4285F4]">G</span>
                   Continuar con Google
                 </button>
+                {appleEnabled && (
+                  <button
+                    onClick={apple}
+                    className="w-full flex items-center justify-center gap-2 bg-black text-white dark:bg-white dark:text-black rounded-2xl py-3.5 font-bold active:scale-[0.98] transition-all mb-3"
+                  >
+                    <AppleLogo size={17} /> Continuar con Apple
+                  </button>
+                )}
                 <button
                   onClick={() => setMode('email')}
                   className="w-full flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-100 rounded-2xl py-3.5 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition-all mb-3"
                 >
                   <Mail size={18} /> Continuar con email
                 </button>
-                <Turnstile onToken={setCaptchaToken} />
+                {captchaBlock}
                 <button
                   onClick={() => auth.continueAsGuest(captchaToken || undefined)}
                   disabled={captchaMissing}

@@ -130,6 +130,12 @@ export function useAuth() {
     });
   }, []);
 
+  // Apple (OAuth; no pasa por captcha → vía a prueba de bloqueadores).
+  const signInApple = useCallback(async () =>
+    supabase.auth.signInWithOAuth({ provider: 'apple', options: { redirectTo: window.location.origin } }), []);
+  const linkApple = useCallback(async () =>
+    supabase.auth.linkIdentity({ provider: 'apple', options: { redirectTo: window.location.origin } }), []);
+
   // Iniciar sesión con email (magic-link) sin usuario previo.
   const signInEmail = useCallback(async (email: string, captchaToken?: string) => {
     return supabase.auth.signInWithOtp({
@@ -147,7 +153,7 @@ export function useAuth() {
 
   return {
     session, user, loading, isAnonymous, authError, profileName, displayName,
-    linkEmail, linkGoogle, signInGoogle, signInEmail, continueAsGuest, signOut, saveName,
+    linkEmail, linkGoogle, signInGoogle, signInApple, linkApple, signInEmail, continueAsGuest, signOut, saveName,
   };
 }
 
