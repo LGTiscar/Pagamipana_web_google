@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { UseAuth } from '../hooks/useAuth';
 import { ThemeToggle } from './ThemeToggle';
+import { Turnstile, captchaEnabled } from './Turnstile';
 
 // Pantalla de onboarding / login (mockup 01). Identidad híbrida:
 // Google · email (magic-link) · "Probar sin cuenta" (anónimo).
@@ -10,6 +11,8 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaMissing = captchaEnabled && !captchaToken;
 
   const google = async () => {
     setError(null);
@@ -21,10 +24,19 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
     if (!email.trim()) return;
     setBusy(true);
     setError(null);
-    const { error } = await auth.signInEmail(email.trim());
+    const { error } = await auth.signInEmail(email.trim(), captchaToken || undefined);
     setBusy(false);
     if (error) setError(error.message);
     else setMode('sent');
+  };
+
+  // Reparto rápido: creamos una sesión anónima (sin registro) para que el OCR vaya
+  // autenticado (el Lambda exige JWT), y entramos al flujo efímero.
+  const startQuick = async () => {
+    setError(null);
+    const { error } = await auth.continueAsGuest(captchaToken || undefined);
+    if (error) { setError('No se pudo iniciar. Inténtalo de nuevo.'); return; }
+    onQuickSplit();
   };
 
   return (
@@ -62,9 +74,10 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
                     autoFocus
                   />
                 </div>
+                <Turnstile onToken={setCaptchaToken} />
                 <button
                   onClick={sendEmail}
-                  disabled={!email.trim() || busy}
+                  disabled={!email.trim() || busy || captchaMissing}
                   className="w-full bg-blue-600 text-white rounded-2xl py-3.5 font-bold hover:bg-blue-700 disabled:opacity-50 active:scale-[0.98] transition-all"
                 >
                   {busy ? 'Enviando…' : 'Enviarme el enlace'}
@@ -85,7 +98,12 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
                 >
                   <Mail size={18} /> Continuar con email
                 </button>
-                <button onClick={auth.continueAsGuest} className="w-full text-blue-600 dark:text-blue-400 font-bold py-2">
+                <Turnstile onToken={setCaptchaToken} />
+                <button
+                  onClick={() => auth.continueAsGuest(captchaToken || undefined)}
+                  disabled={captchaMissing}
+                  className="w-full text-blue-600 dark:text-blue-400 font-bold py-2 disabled:opacity-50"
+                >
                   Probar sin cuenta →
                 </button>
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-3 leading-relaxed">
@@ -97,7 +115,7 @@ export const LoginScreen: React.FC<{ auth: UseAuth; onQuickSplit: () => void }> 
                   <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-semibold">o solo un ticket</span>
                   <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
                 </div>
-                <button onClick={onQuickSplit} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white py-2">
+                <button onClick={startQuick} disabled={captchaMissing} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white py-2 disabled:opacity-50">
                   🧾 Reparto rápido, sin cuenta
                 </button>
               </>

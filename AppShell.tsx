@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import App from './App';
 import { HomeProjects } from './components/HomeProjects';
 import { ProjectDetail } from './components/ProjectDetail';
 import { ProjectPeopleStep } from './components/ProjectPeopleStep';
@@ -11,9 +10,8 @@ import { useAuth } from './hooks/useAuth';
 import { Project } from './types';
 
 // Raíz de la app. Gestiona la sesión (identidad híbrida) y decide qué mostrar:
-//  - ?session=xxx → wizard de ticket en vivo (links de invitación existentes).
-//  - ?join=xxx    → unirse a un proyecto por enlace y abrirlo.
-//  - resto        → login / "Mis proyectos" / detalle / reparto rápido.
+//  - ?join=xxx → unirse a un proyecto por enlace y abrirlo.
+//  - resto     → login / "Mis proyectos" / detalle / reparto rápido.
 export default function AppShell() {
   const auth = useAuth();
   const [quickMode, setQuickMode] = useState(false);
@@ -23,19 +21,12 @@ export default function AppShell() {
     () => new URLSearchParams(window.location.search).get('join'),
   );
 
-  const hasLiveSession = useMemo(
-    () => new URLSearchParams(window.location.search).has('session'),
-    [],
-  );
-
   const stripJoin = () => {
     const params = new URLSearchParams(window.location.search);
     params.delete('join');
     const qs = params.toString();
     window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
   };
-
-  if (hasLiveSession) return <App />;
 
   if (auth.loading) {
     return (

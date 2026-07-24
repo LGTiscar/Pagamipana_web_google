@@ -16,6 +16,9 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# .env.production SÍ se commitea: solo contiene valores PÚBLICOS (URL + publishable key),
+# que de todas formas van incrustados en el bundle que se sirve al navegador.
+!.env.production
 
 # Editor directories and files
 .vscode/*

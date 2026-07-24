@@ -9,7 +9,6 @@ con OCR** (el diferenciador). UI en **español**, mobile-first, empaquetable com
 - **Backend**: **Supabase** (Postgres + Auth + RLS + RPC). El cliente está en `services/supabaseClient.ts`.
 - **OCR**: AWS Lambda externo (endpoint en `services/ocr.ts`). Convive con Supabase; no se sustituye.
 - **Nativo**: **Capacitor** (`android/`, `ios/`). Ver `NATIVE_HANDOFF.md`.
-- **Realtime legacy**: MQTT (broker público HiveMQ) — solo en el wizard antiguo, ver más abajo.
 
 ## Cómo ejecutar
 ```bash
@@ -30,7 +29,6 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
 
 ## Arquitectura
 - **`AppShell.tsx`** (raíz) decide qué se muestra:
-  - `?session=…` → `App.tsx` (wizard **legacy** de reparto en vivo por MQTT; solo compat de enlaces viejos).
   - `quickMode` → `QuickSplit` (reparto rápido **sin cuenta ni proyecto**, efímero).
   - sin sesión → `LoginScreen`.
   - `?join=…` → `JoinScreen` (unirse a un proyecto por enlace, pide nombre).
@@ -44,8 +42,8 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
 - **`components/`** (nuevo diseño): `LoginScreen`, `JoinScreen`, `HomeProjects`, `ProjectDetail`
   (pestañas **Gastos · Balances · Miembros**), `CreateProjectSheet`, `AddExpenseSheet`, `ScanExpenseSheet`
   (OCR), `ItemAssigner` (asignación por línea/unidades, reutilizado en OCR de proyecto y en QuickSplit),
-  `InvitePanel` (QR+enlace, reutilizado), `QuickSplit`, `LinkAccountSheet`, `ThemeToggle`, `Button`, `Logo`.
-- **Legacy** (no tocar salvo necesidad): `App.tsx`, `components/Step*.tsx`, MQTT, `services/geminiService.ts` (stub).
+  `InvitePanel` (QR+enlace, reutilizado), `QuickSplit`, `LinkAccountSheet`, `Turnstile` (CAPTCHA), `ThemeToggle`, `Button`, `Logo`.
+- **Auth/OCR**: `services/ocr.ts` envía el JWT de Supabase al Lambda (ver `SECURITY.md`). `useAuth` acepta `captchaToken`.
 
 ## Modelo de datos (Supabase)
 Tablas: `profiles`, `projects`, `participants` (¡`profile_id` NULL = participante sin cuenta!),
@@ -58,7 +56,8 @@ Archivar = `projects.archived_at`.
 `0001` base (profiles/projects/participants + RLS + create_project) · `0002` gastos (expenses/shares +
 add_expense/get_balances) · `0003` join_project · `0004` list_projects_overview · `0005` expense_items +
 add_ocr_expense · `0006` settlements (+ balances con liquidaciones) · `0007` archivar (overview con
-`archived_at` + filtro). **Al crear una migración nueva, recuérdale al usuario que la ejecute.**
+`archived_at` + filtro) · `0008` limpieza de anónimos (`pg_cron`).
+**Al crear una migración nueva, recuérdale al usuario que la ejecute.**
 
 ## Convenciones
 - **Copys en español** (cercano, "entre panas"). Acento de marca amable.
@@ -79,8 +78,9 @@ limpieza). Útil para validar migraciones/RLS sin UI. Se escribe temporal y se b
 - `PLAN_PROYECTOS.md` — producto y fases (1: fundación · 2: gastos · 3: OCR · 4: liquidación+Capacitor).
 - `DESIGN_HANDOFF.md` — lenguaje visual.
 - `NATIVE_HANDOFF.md` — build y publicación Android/iOS + pendiente de deep-links del login.
+- `SECURITY.md` — medidas de seguridad y pasos pendientes de consola/Lambda.
 
 ## Pendiente / próximos pasos
+- **Acciones de seguridad en consola** (verificar JWT en el Lambda de OCR, activar CAPTCHA + rate-limits, correr `0008`) — ver `SECURITY.md`.
 - **Deep-links del login nativo** (Google/magic-link en la app) — ver `NATIVE_HANDOFF.md`. El modo invitado ya funciona en nativo.
 - Iconos/splash nativos (`@capacitor/assets`), cámara nativa opcional (`@capacitor/camera`).
-- Limpieza periódica de usuarios anónimos abandonados.

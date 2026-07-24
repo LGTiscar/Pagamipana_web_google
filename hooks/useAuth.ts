@@ -131,15 +131,16 @@ export function useAuth() {
   }, []);
 
   // Iniciar sesión con email (magic-link) sin usuario previo.
-  const signInEmail = useCallback(async (email: string) => {
+  const signInEmail = useCallback(async (email: string, captchaToken?: string) => {
     return supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, captchaToken },
     });
   }, []);
 
   // Entrar como invitado (sesión anónima, fricción cero).
-  const continueAsGuest = useCallback(async () => supabase.auth.signInAnonymously(), []);
+  const continueAsGuest = useCallback(async (captchaToken?: string) =>
+    supabase.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined), []);
 
   // Cerrar sesión → sin sesión → vuelve a la pantalla de login.
   const signOut = useCallback(async () => { await supabase.auth.signOut(); }, []);
