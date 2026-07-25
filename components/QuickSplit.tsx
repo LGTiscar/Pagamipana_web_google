@@ -74,8 +74,24 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const debts = people.filter(p => p.id !== payer && (totals[p.id] || 0) > 0.005);
 
   const share = async () => {
-    let text = `🧾 PagaMiPana · Reparto rápido (Total ${formatMoney(total)})\nPagó: ${payerName}\n\n`;
-    debts.forEach(p => { text += `${p.name} debe a ${payerName}: ${formatMoney(totals[p.id])}\n`; });
+    const itemsFor = (pid: string) => lines
+      .map(l => ({ l, amt: lineShareFor(l, pid), units: lineUnitsFor(l, pid) }))
+      .filter(x => x.amt > 0.005);
+
+    let text = `🧾 PagaMiPana · Reparto rápido\nTotal: ${formatMoney(total)} · Pagó ${payerName}\n`;
+
+    text += `\n📋 Qué consumió cada uno`;
+    people.forEach(p => {
+      text += `\n${p.name}${p.id === payer ? ' (pagó)' : ''} — ${formatMoney(totals[p.id] || 0)}`;
+      const its = itemsFor(p.id);
+      if (its.length === 0) text += `\n  · (nada)`;
+      else its.forEach(({ l, amt, units }) => { text += `\n  · ${units > 1 ? units + '× ' : ''}${l.description || 'Producto'}: ${formatMoney(amt)}`; });
+    });
+
+    text += debts.length
+      ? `\n\n💸 A pagar a ${payerName}` + debts.map(p => `\n  · ${p.name}: ${formatMoney(totals[p.id])}`).join('')
+      : `\n\n✅ Nadie debe nada`;
+
     if (navigator.share) {
       try { await navigator.share({ title: 'PagaMiPana', text }); } catch { /* cancelado */ }
     } else {
