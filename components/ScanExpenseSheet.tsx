@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { X, Camera, Loader2 } from 'lucide-react';
+import { X, Camera, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Participant, Expense } from '../types';
 import { processImageFile } from '../services/imageProcessor';
 import { ocrReceipt } from '../services/ocr';
-import { addOcrExpense } from '../services/expenses';
+import { addOcrExpense, updateOcrExpense } from '../services/expenses';
 import { formatMoney } from '../services/format';
 import { SplitLine, linesFromReceipt, linesTotal, unassignedUnits, allAssigned as allAssignedFn, sharesFor, itemsFor } from '../services/itemSplit';
 import { ItemAssigner } from './ItemAssigner';
@@ -13,6 +13,9 @@ interface Props {
   currency: string;
   participants: Participant[];
   defaultPaidBy?: string;
+  // Modo edición: gasto OCR existente + sus líneas reconstruidas (salta la captura).
+  expense?: Expense;
+  initialLines?: SplitLine[];
   onClose: () => void;
   onAdded: (e: Expense) => void;
 }
@@ -20,15 +23,17 @@ interface Props {
 const initials = (n: string) => n.trim().charAt(0).toUpperCase() || '?';
 
 export const ScanExpenseSheet: React.FC<Props> = ({
-  projectId, currency, participants, defaultPaidBy, onClose, onAdded,
+  projectId, currency, participants, defaultPaidBy, expense, initialLines, onClose, onAdded,
 }) => {
-  const [phase, setPhase] = useState<'capture' | 'loading' | 'assign'>('capture');
-  const [lines, setLines] = useState<SplitLine[]>([]);
-  const [description, setDescription] = useState('Ticket');
-  const [paidBy, setPaidBy] = useState(defaultPaidBy ?? participants[0]?.id ?? '');
+  const editing = !!expense;
+  const [phase, setPhase] = useState<'capture' | 'loading' | 'assign'>(editing ? 'assign' : 'capture');
+  const [lines, setLines] = useState<SplitLine[]>(initialLines ?? []);
+  const [description, setDescription] = useState(expense?.description ?? 'Ticket');
+  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? defaultPaidBy ?? participants[0]?.id ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const people = useMemo(() => participants.map(p => ({ id: p.id, name: p.display_name, color: p.color })), [participants]);
   const total = linesTotal(lines);
@@ -49,7 +54,8 @@ export const ScanExpenseSheet: React.FC<Props> = ({
       setError(err.message ?? 'No se pudo leer el ticket.');
       setPhase('capture');
     } finally {
-      if (fileRef.current) fileRef.current.value = '';
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (galleryRef.current) galleryRef.current.value = '';
     }
   };
 
@@ -58,10 +64,13 @@ export const ScanExpenseSheet: React.FC<Props> = ({
     setSaving(true);
     setError(null);
     try {
-      const e = await addOcrExpense({
-        projectId, description: description.trim() || 'Ticket', amount: total, paidBy,
+      const payload = {
+        description: description.trim() || 'Ticket', amount: total, paidBy,
         shares: sharesFor(lines), items: itemsFor(lines),
-      });
+      };
+      const e = editing
+        ? await updateOcrExpense({ id: expense!.id, ...payload })
+        : await addOcrExpense({ projectId, ...payload });
       onAdded(e);
     } catch (err: any) {
       setError(err.message ?? 'No se pudo guardar el gasto.');
@@ -73,19 +82,24 @@ export const ScanExpenseSheet: React.FC<Props> = ({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-fade-in max-h-[92dvh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 pb-2">
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Escanear ticket</h2>
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{editing ? 'Editar ticket' : 'Escanear ticket'}</h2>
           <button onClick={onClose} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white"><X size={20} /></button>
         </div>
 
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+        {/* Cámara (capture) y galería (sin capture) — en móvil son flujos distintos */}
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+        <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
         {phase === 'capture' ? (
           <div className="px-5 pb-6 pt-2 text-center">
             <div className="rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 py-10 px-4">
               <Camera className="mx-auto text-zinc-400 dark:text-zinc-500" size={36} />
-              <p className="font-bold text-zinc-900 dark:text-zinc-50 mt-3">Haz una foto del ticket</p>
+              <p className="font-bold text-zinc-900 dark:text-zinc-50 mt-3">Foto del ticket</p>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Sacamos los productos y repartís quién tomó qué.</p>
-              <button onClick={() => fileRef.current?.click()} className="mt-5 inline-flex items-center gap-2 bg-blue-600 text-white rounded-full px-6 py-3 font-bold hover:bg-blue-700 active:scale-95 transition-all"><Camera size={18} /> Hacer foto / elegir</button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center mt-5">
+                <button onClick={() => cameraRef.current?.click()} className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-full px-5 py-3 font-bold hover:bg-blue-700 active:scale-95 transition-all"><Camera size={18} /> Hacer foto</button>
+                <button onClick={() => galleryRef.current?.click()} className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-full px-5 py-3 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-95 transition-all"><ImageIcon size={18} /> Elegir de galería</button>
+              </div>
             </div>
             {error && <p className="text-sm text-red-500 dark:text-red-400 mt-3">{error}</p>}
           </div>

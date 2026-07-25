@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { Participant, SplitType, SPLIT_TYPES, Expense } from '../types';
-import { addExpense } from '../services/expenses';
+import { addExpense, updateExpense } from '../services/expenses';
 import { formatMoney } from '../services/format';
 
 interface Props {
@@ -9,6 +9,9 @@ interface Props {
   currency: string;
   participants: Participant[];
   defaultPaidBy?: string;
+  // Modo edición: gasto existente + sus shares (prefill como "exacto", reproduce el reparto).
+  expense?: Expense;
+  initialShares?: { participant_id: string; amount: number }[];
   onClose: () => void;
   onAdded: (e: Expense) => void;
 }
@@ -21,16 +24,24 @@ const num = (s: string) => {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export const AddExpenseSheet: React.FC<Props> = ({
-  projectId, currency, participants, defaultPaidBy, onClose, onAdded,
+  projectId, currency, participants, defaultPaidBy, expense, initialShares, onClose, onAdded,
 }) => {
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [paidBy, setPaidBy] = useState(defaultPaidBy ?? participants[0]?.id ?? '');
-  const [splitType, setSplitType] = useState<SplitType>('equal');
-  const [selected, setSelected] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(participants.map(p => [p.id, true])),
+  const editing = !!expense;
+  const [amount, setAmount] = useState(() => (expense ? String(Number(expense.amount_total)) : ''));
+  const [description, setDescription] = useState(expense?.description ?? '');
+  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? defaultPaidBy ?? participants[0]?.id ?? '');
+  // Al editar entramos en "exacto" con los importes guardados: reproduce el reparto sin pérdida.
+  const [splitType, setSplitType] = useState<SplitType>(editing ? 'exact' : 'equal');
+  const [selected, setSelected] = useState<Record<string, boolean>>(() =>
+    editing
+      ? Object.fromEntries(participants.map(p => [p.id, !!initialShares?.some(s => s.participant_id === p.id)]))
+      : Object.fromEntries(participants.map(p => [p.id, true])),
   );
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    editing && initialShares
+      ? Object.fromEntries(initialShares.map(s => [s.participant_id, s.amount.toFixed(2)]))
+      : {},
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,22 +58,34 @@ export const AddExpenseSheet: React.FC<Props> = ({
       for (let i = 0; i < out.length && remainderCents > 0; i++, remainderCents--) out[i].amount = r2(out[i].amount + 0.01);
       return out;
     }
+    // Exacto: se valida aparte (remaining); devolvemos tal cual, sin cuadrar.
     if (splitType === 'exact') return sel.map(p => ({ participant_id: p.id, amount: r2(num(values[p.id])) }));
-    if (splitType === 'percent') out = sel.map(p => ({ participant_id: p.id, amount: r2(total * num(values[p.id]) / 100) }));
-    else {
-      const totalW = sel.reduce((a, p) => a + (num(values[p.id]) || 1), 0) || 1;
-      out = sel.map(p => ({ participant_id: p.id, amount: r2(total * (num(values[p.id]) || 1) / totalW) }));
+    if (splitType === 'percent') {
+      out = sel.map(p => ({ participant_id: p.id, amount: r2(total * num(values[p.id]) / 100) }));
+    } else {
+      // Partes: campo vacío = 1 (por defecto); un 0 explícito significa 0 partes → no paga.
+      const weightOf = (id: string) => {
+        const raw = values[id];
+        return raw == null || raw.trim() === '' ? 1 : Math.max(0, num(raw));
+      };
+      const totalW = sel.reduce((a, p) => a + weightOf(p.id), 0) || 1;
+      out = sel.map(p => ({ participant_id: p.id, amount: r2(total * weightOf(p.id) / totalW) }));
     }
-    const sum = out.reduce((a, s) => a + s.amount, 0);
-    const diff = r2(total - sum);
-    if (out.length) out[0].amount = r2(out[0].amount + diff);
+    // Fuera quien no participa (0 partes / 0 %) y cuadramos el redondeo sobre el mayor.
+    out = out.filter(s => s.amount > 0.0001);
+    if (out.length) {
+      const sum = out.reduce((a, s) => a + s.amount, 0);
+      const diff = r2(total - sum);
+      const t = out.reduce((mi, s, i, arr) => (s.amount > arr[mi].amount ? i : mi), 0);
+      out[t].amount = r2(out[t].amount + diff);
+    }
     return out;
   }, [total, splitType, sel, values]);
 
   const sharesSum = r2(shares.reduce((a, s) => a + s.amount, 0));
   const remaining = r2(total - sharesSum);
   const exactBalanced = splitType !== 'exact' || Math.abs(remaining) < 0.01;
-  const canSave = total > 0 && description.trim() !== '' && paidBy && sel.length > 0 && exactBalanced;
+  const canSave = total > 0 && description.trim() !== '' && paidBy && sel.length > 0 && exactBalanced && shares.length > 0;
   const shareOf = (id: string) => shares.find(s => s.participant_id === id)?.amount ?? 0;
   const needsInput = splitType !== 'equal';
   const inputSuffix = splitType === 'percent' ? '%' : splitType === 'shares' ? 'x' : currency === 'EUR' ? '€' : '';
@@ -72,7 +95,9 @@ export const AddExpenseSheet: React.FC<Props> = ({
     setSaving(true);
     setError(null);
     try {
-      const e = await addExpense({ projectId, description: description.trim(), amount: total, paidBy, splitType, source: 'manual', shares });
+      const e = editing
+        ? await updateExpense({ id: expense!.id, description: description.trim(), amount: total, paidBy, splitType, shares })
+        : await addExpense({ projectId, description: description.trim(), amount: total, paidBy, splitType, source: 'manual', shares });
       onAdded(e);
     } catch (err: any) {
       setError(err.message ?? 'No se pudo guardar el gasto.');
@@ -84,7 +109,7 @@ export const AddExpenseSheet: React.FC<Props> = ({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-fade-in max-h-[92dvh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 pb-2">
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Nuevo gasto</h2>
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{editing ? 'Editar gasto' : 'Nuevo gasto'}</h2>
           <button onClick={onClose} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white"><X size={20} /></button>
         </div>
 
@@ -184,7 +209,7 @@ export const AddExpenseSheet: React.FC<Props> = ({
             disabled={!canSave || saving}
             className="w-full bg-blue-600 text-white rounded-full py-3.5 font-bold hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-[0.98]"
           >
-            {saving ? 'Guardando…' : 'Guardar gasto'}
+            {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Guardar gasto'}
           </button>
         </div>
       </div>

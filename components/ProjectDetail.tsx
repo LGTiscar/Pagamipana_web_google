@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera } from 'lucide-react';
-import { Participant, Project, Expense, Balance, projectEmoji } from '../types';
+import { Participant, Project, Expense, Balance, Settlement, projectEmoji } from '../types';
 import { listParticipants, deleteProject } from '../services/projects';
-import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement } from '../services/expenses';
+import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
+import { SplitLine, linesFromItems } from '../services/itemSplit';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
 import { ScanExpenseSheet } from './ScanExpenseSheet';
 import { InvitePanel } from './InvitePanel';
+
+const num = (s: string) => { const v = parseFloat((s ?? '').replace(',', '.')); return isNaN(v) ? 0 : v; };
+const r2 = (n: number) => Math.round(n * 100) / 100;
 
 interface Props {
   project: Project;
@@ -28,7 +32,17 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [fabOpen, setFabOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [settlingIdx, setSettlingIdx] = useState<number | null>(null);
+  // Edición de gastos (prefill cargado de BD)
+  const [editManual, setEditManual] = useState<{ expense: Expense; shares: { participant_id: string; amount: number }[] } | null>(null);
+  const [editOcr, setEditOcr] = useState<{ expense: Expense; lines: SplitLine[] } | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  // Borrado de gasto (con confirmación)
+  const [confirmExpense, setConfirmExpense] = useState<Expense | null>(null);
+  const [deletingExpense, setDeletingExpense] = useState(false);
+  // Reembolso (importe editable, pagos parciales)
+  const [settleTarget, setSettleTarget] = useState<{ s: Settlement; idx: number } | null>(null);
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settling, setSettling] = useState(false);
 
   const cur = project.currency;
 
@@ -68,17 +82,59 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
   const maxAbs = useMemo(() => Math.max(1, ...balances.map(b => Math.abs(b.net))), [balances]);
 
-  const removeExpense = async (id: string) => { await deleteExpense(id); await load(); };
-
-  const markPaid = async (s: { from: string; to: string; amount: number }, idx: number) => {
-    setSettlingIdx(idx);
+  // Abre el gasto en modo edición, cargando sus datos (shares o líneas del ticket).
+  const openEdit = async (e: Expense) => {
+    setOpeningId(e.id);
+    setError(null);
     try {
-      await recordSettlement(project.id, s.from, s.to, s.amount);
+      if (e.source === 'ocr') {
+        const items = await listExpenseItems(e.id);
+        setEditOcr({ expense: e, lines: linesFromItems(items) });
+      } else {
+        const shares = await listExpenseShares(e.id);
+        setEditManual({ expense: e, shares });
+      }
+    } catch (err: any) {
+      setError(err.message ?? 'No se pudo abrir el gasto para editar.');
+    } finally {
+      setOpeningId(null);
+    }
+  };
+
+  const doDeleteExpense = async () => {
+    if (!confirmExpense) return;
+    setDeletingExpense(true);
+    try {
+      await deleteExpense(confirmExpense.id);
+      setConfirmExpense(null);
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo eliminar el gasto.');
+    } finally {
+      setDeletingExpense(false);
+    }
+  };
+
+  // Abre el modal de reembolso con el importe sugerido por defecto (editable).
+  const openSettle = (s: Settlement, idx: number) => {
+    setSettleTarget({ s, idx });
+    setSettleAmount(s.amount.toFixed(2));
+  };
+
+  const doSettle = async () => {
+    if (!settleTarget) return;
+    const amount = r2(num(settleAmount));
+    if (amount <= 0) { setError('Introduce un importe mayor que 0.'); return; }
+    setSettling(true);
+    setError(null);
+    try {
+      await recordSettlement(project.id, settleTarget.s.from, settleTarget.s.to, amount);
       setBalances(await getBalances(project.id));
+      setSettleTarget(null);
     } catch (e: any) {
       setError(e.message ?? 'No se pudo registrar el pago.');
     } finally {
-      setSettlingIdx(null);
+      setSettling(false);
     }
   };
 
@@ -158,7 +214,10 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                     </div>
                   </div>
                   <div className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
-                  <button onClick={() => removeExpense(e.id)} className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
+                  <button onClick={() => openEdit(e)} disabled={openingId === e.id} className="text-zinc-300 dark:text-zinc-600 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 disabled:opacity-50" aria-label="Editar gasto">
+                    {openingId === e.id ? <Loader2 size={16} className="animate-spin" /> : <Pencil size={15} />}
+                  </button>
+                  <button onClick={() => setConfirmExpense(e)} className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
                 </div>
               ))}
             </div>
@@ -200,10 +259,9 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                     <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 flex-1 min-w-0 truncate">{nameOf(s.from)} <span className="text-zinc-300 dark:text-zinc-600">→</span> {nameOf(s.to)}</span>
                     <span className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(s.amount, cur)}</span>
                     <button
-                      onClick={() => markPaid(s, i)}
-                      disabled={settlingIdx === i}
-                      className="ml-1 shrink-0 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full px-3 py-1.5 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-950 disabled:opacity-50"
-                    >{settlingIdx === i ? '…' : 'Pagado'}</button>
+                      onClick={() => openSettle(s, i)}
+                      className="ml-1 shrink-0 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full px-3 py-1.5 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-950"
+                    >Pagar</button>
                   </div>
                 ))}
               </div>
@@ -286,6 +344,76 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
           onClose={() => setShowScan(false)}
           onAdded={() => { setShowScan(false); load(); }}
         />
+      )}
+
+      {editManual && (
+        <AddExpenseSheet
+          projectId={project.id}
+          currency={cur}
+          participants={participants}
+          expense={editManual.expense}
+          initialShares={editManual.shares}
+          onClose={() => setEditManual(null)}
+          onAdded={() => { setEditManual(null); load(); }}
+        />
+      )}
+
+      {editOcr && (
+        <ScanExpenseSheet
+          projectId={project.id}
+          currency={cur}
+          participants={participants}
+          expense={editOcr.expense}
+          initialLines={editOcr.lines}
+          onClose={() => setEditOcr(null)}
+          onAdded={() => { setEditOcr(null); load(); }}
+        />
+      )}
+
+      {confirmExpense && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => !deletingExpense && setConfirmExpense(null)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Eliminar este gasto?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+              «{confirmExpense.description}» · {formatMoney(Number(confirmExpense.amount_total), cur)}. Se recalcularán los balances. No se puede deshacer.
+            </p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirmExpense(null)} disabled={deletingExpense} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={doDeleteExpense} disabled={deletingExpense} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deletingExpense ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settleTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => !settling && setSettleTarget(null)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Registrar pago</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+              <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.from)}</b> paga a <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.to)}</b>. Puedes abonar todo o solo una parte.
+            </p>
+            <div className="text-center py-3">
+              <input
+                value={settleAmount}
+                onChange={e => setSettleAmount(e.target.value)}
+                inputMode="decimal"
+                autoFocus
+                className="w-full text-center text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 outline-none bg-transparent"
+              />
+              <div className="text-xs text-zinc-400 dark:text-zinc-500 font-semibold mt-1">
+                Importe ({cur}) · sugerido {formatMoney(settleTarget.s.amount, cur)}
+              </div>
+            </div>
+            <button
+              onClick={() => setSettleAmount(settleTarget.s.amount.toFixed(2))}
+              className="w-full text-xs font-bold text-blue-600 dark:text-blue-400 mb-4"
+            >Saldar todo ({formatMoney(settleTarget.s.amount, cur)})</button>
+            <div className="flex gap-3">
+              <button onClick={() => setSettleTarget(null)} disabled={settling} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={doSettle} disabled={settling || num(settleAmount) <= 0} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{settling ? 'Guardando…' : 'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmDelete && (

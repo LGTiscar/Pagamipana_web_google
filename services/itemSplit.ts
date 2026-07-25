@@ -22,6 +22,18 @@ export function linesFromReceipt(
   });
 }
 
+// Reconstruye líneas a partir de los ítems guardados de un gasto OCR (para editar).
+// Solo persistimos owner_ids (unión) por línea, así que restauramos un reparto
+// UNIFORME: cada unidad hereda esos owners. Suficiente para el caso habitual.
+export function linesFromItems(
+  items: { id: string; description: string; quantity: number; unit_price: number; owner_ids: string[] }[],
+): SplitLine[] {
+  return items.map(it => {
+    const q = Math.max(1, Math.round(it.quantity) || 1);
+    return { id: it.id, description: it.description, quantity: q, price: r2(it.unit_price * q), units: Array.from({ length: q }, () => [...it.owner_ids]) };
+  });
+}
+
 export const unitPrice = (l: SplitLine) => l.price / Math.max(1, l.quantity);
 
 const key = (owners: string[]) => [...owners].sort().join(',');
@@ -83,3 +95,18 @@ export function toggleUnit(l: SplitLine, idx: number, pid: string): SplitLine {
 }
 export const resetLine = (l: SplitLine): SplitLine => ({ ...l, units: l.units.map(() => []) });
 export const setPrice = (l: SplitLine, price: number): SplitLine => ({ ...l, price });
+export const setDescription = (l: SplitLine, description: string): SplitLine => ({ ...l, description });
+
+// Cambia la cantidad de unidades conservando las asignaciones de las que ya existían.
+export function setQuantity(l: SplitLine, q: number): SplitLine {
+  const n = Math.max(1, Math.round(q) || 1);
+  const units = Array.from({ length: n }, (_, i) => (l.units[i] ? [...l.units[i]] : []));
+  return { ...l, quantity: n, units };
+}
+
+const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `line-${Date.now()}-${Math.round(Math.random() * 1e9)}`);
+
+// Línea nueva creada a mano (producto que el OCR se dejó o leyó mal).
+export function newLine(description = '', price = 0): SplitLine {
+  return { id: uid(), description, quantity: 1, price, units: [[]] };
+}

@@ -54,6 +54,78 @@ export async function addOcrExpense(input: {
   return data as Expense;
 }
 
+// Edita un gasto manual: actualiza la fila y regenera sus shares (atómico).
+export async function updateExpense(input: {
+  id: string;
+  description: string;
+  amount: number;
+  paidBy: string;
+  splitType: SplitType;
+  shares: { participant_id: string; amount: number }[];
+}): Promise<Expense> {
+  const { data, error } = await supabase.rpc('update_expense', {
+    p_expense_id: input.id,
+    p_description: input.description,
+    p_amount: input.amount,
+    p_paid_by: input.paidBy,
+    p_split_type: input.splitType,
+    p_shares: input.shares,
+  });
+  if (error) throw error;
+  return data as Expense;
+}
+
+// Edita un gasto por ticket: actualiza fila + shares + líneas del ticket (atómico).
+export async function updateOcrExpense(input: {
+  id: string;
+  description: string;
+  amount: number;
+  paidBy: string;
+  shares: { participant_id: string; amount: number }[];
+  items: { description: string; quantity: number; unit_price: number; owner_ids: string[] }[];
+}): Promise<Expense> {
+  const { data, error } = await supabase.rpc('update_ocr_expense', {
+    p_expense_id: input.id,
+    p_description: input.description,
+    p_amount: input.amount,
+    p_paid_by: input.paidBy,
+    p_shares: input.shares,
+    p_items: input.items,
+  });
+  if (error) throw error;
+  return data as Expense;
+}
+
+// Shares actuales de un gasto (para prefilar la edición).
+export async function listExpenseShares(
+  expenseId: string,
+): Promise<{ participant_id: string; amount: number }[]> {
+  const { data, error } = await supabase
+    .from('expense_shares')
+    .select('participant_id, amount')
+    .eq('expense_id', expenseId);
+  if (error) throw error;
+  return (data ?? []).map((s: any) => ({ participant_id: s.participant_id, amount: Number(s.amount) }));
+}
+
+// Líneas del ticket de un gasto OCR (para prefilar la edición).
+export async function listExpenseItems(
+  expenseId: string,
+): Promise<{ id: string; description: string; quantity: number; unit_price: number; owner_ids: string[] }[]> {
+  const { data, error } = await supabase
+    .from('expense_items')
+    .select('id, description, quantity, unit_price, owner_ids')
+    .eq('expense_id', expenseId);
+  if (error) throw error;
+  return (data ?? []).map((it: any) => ({
+    id: it.id,
+    description: it.description,
+    quantity: Number(it.quantity),
+    unit_price: Number(it.unit_price),
+    owner_ids: (it.owner_ids ?? []) as string[],
+  }));
+}
+
 export async function deleteExpense(id: string): Promise<void> {
   const { error } = await supabase.from('expenses').delete().eq('id', id);
   if (error) throw error;

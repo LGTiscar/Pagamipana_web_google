@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Camera, Loader2, Plus, X, RotateCcw, Share2 } from 'lucide-react';
+import { ChevronLeft, Camera, Loader2, Plus, X, RotateCcw, Share2, Image as ImageIcon } from 'lucide-react';
 import { AVATAR_COLORS } from '../types';
 import { processImageFile } from '../services/imageProcessor';
 import { ocrReceipt } from '../services/ocr';
@@ -37,7 +37,8 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [payer, setPayer] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const addPerson = () => {
     if (!name.trim()) return;
@@ -59,7 +60,8 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       setError(err.message ?? 'No se pudo leer el ticket.');
       setStep('scan');
     } finally {
-      if (fileRef.current) fileRef.current.value = '';
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (galleryRef.current) galleryRef.current.value = '';
     }
   };
 
@@ -112,7 +114,8 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   if (step === 'scan' || step === 'loading') {
     return (
       <QuickShell title="Escanear ticket" onBack={() => setStep('people')}>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+        <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
         {step === 'loading' ? (
           <div className="py-16 flex flex-col items-center text-center">
             <Loader2 className="animate-spin text-blue-600" size={34} />
@@ -122,9 +125,12 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           <div className="text-center pt-2">
             <div className="rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 py-10 px-4">
               <Camera className="mx-auto text-zinc-400 dark:text-zinc-500" size={36} />
-              <p className="font-bold text-zinc-900 dark:text-zinc-50 mt-3">Haz una foto del ticket</p>
+              <p className="font-bold text-zinc-900 dark:text-zinc-50 mt-3">Foto del ticket</p>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Sacamos los productos automáticamente.</p>
-              <button onClick={() => fileRef.current?.click()} className="mt-5 inline-flex items-center gap-2 bg-blue-600 text-white rounded-full px-6 py-3 font-bold hover:bg-blue-700 active:scale-95 transition-all"><Camera size={18} /> Hacer foto / elegir</button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center mt-5">
+                <button onClick={() => cameraRef.current?.click()} className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-full px-5 py-3 font-bold hover:bg-blue-700 active:scale-95 transition-all"><Camera size={18} /> Hacer foto</button>
+                <button onClick={() => galleryRef.current?.click()} className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100 rounded-full px-5 py-3 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-95 transition-all"><ImageIcon size={18} /> Elegir de galería</button>
+              </div>
             </div>
             {error && <p className="text-sm text-red-500 dark:text-red-400 mt-3">{error}</p>}
           </div>

@@ -41,7 +41,8 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
   unidades), `format` (moneda), `currencies` (ISO 4217 vía `Intl`), `imageProcessor` (normaliza/HEIC→JPEG).
 - **`components/`** (nuevo diseño): `LoginScreen`, `JoinScreen`, `HomeProjects`, `ProjectDetail`
   (pestañas **Gastos · Balances · Miembros**), `CreateProjectSheet`, `AddExpenseSheet`, `ScanExpenseSheet`
-  (OCR), `ItemAssigner` (asignación por línea/unidades, reutilizado en OCR de proyecto y en QuickSplit),
+  (OCR), `ItemAssigner` (asignación por línea/unidades + corrección del OCR: editar nombre/cantidad/precio,
+  borrar y añadir líneas; reutilizado en OCR de proyecto, edición de ticket y QuickSplit),
   `InvitePanel` (QR+enlace, reutilizado), `QuickSplit`, `LinkAccountSheet`, `Turnstile` (CAPTCHA), `ThemeToggle`, `Button`, `Logo`.
 - **Auth/OCR**: `services/ocr.ts` envía el JWT de Supabase al Lambda (ver `SECURITY.md`). `useAuth` acepta `captchaToken`.
 
@@ -56,7 +57,8 @@ Archivar = `projects.archived_at`.
 `0001` base (profiles/projects/participants + RLS + create_project) · `0002` gastos (expenses/shares +
 add_expense/get_balances) · `0003` join_project · `0004` list_projects_overview · `0005` expense_items +
 add_ocr_expense · `0006` settlements (+ balances con liquidaciones) · `0007` archivar (overview con
-`archived_at` + filtro) · `0008` limpieza de anónimos (`pg_cron`).
+`archived_at` + filtro) · `0008` limpieza de anónimos (`pg_cron`) · `0009` editar gastos
+(`update_expense` / `update_ocr_expense`).
 **Al crear una migración nueva, recuérdale al usuario que la ejecute.**
 
 ## Convenciones
