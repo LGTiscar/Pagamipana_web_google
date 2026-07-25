@@ -250,7 +250,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
               Cómo saldar {settlements.length > 0 && `· ${settlements.length} pago${settlements.length > 1 ? 's' : ''}`}
             </div>
             {settlements.length === 0 ? (
-              <div className="text-sm text-zinc-400 dark:text-zinc-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-5 text-center">Todo cuadrado ✓</div>
+              <div className="text-sm text-zinc-400 dark:text-zinc-500 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-5 text-center">Todo saldado ✓</div>
             ) : (
               <div className="space-y-2">
                 {settlements.map((s, i) => (

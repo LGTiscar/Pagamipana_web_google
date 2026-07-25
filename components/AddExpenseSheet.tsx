@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Minus, Plus } from 'lucide-react';
 import { Participant, SplitType, SPLIT_TYPES, Expense } from '../types';
 import { addExpense, updateExpense } from '../services/expenses';
 import { formatMoney } from '../services/format';
@@ -88,7 +88,14 @@ export const AddExpenseSheet: React.FC<Props> = ({
   const canSave = total > 0 && description.trim() !== '' && paidBy && sel.length > 0 && exactBalanced && shares.length > 0;
   const shareOf = (id: string) => shares.find(s => s.participant_id === id)?.amount ?? 0;
   const needsInput = splitType !== 'equal';
-  const inputSuffix = splitType === 'percent' ? '%' : splitType === 'shares' ? 'x' : currency === 'EUR' ? '€' : '';
+  const inputSuffix = splitType === 'percent' ? '%' : currency === 'EUR' ? '€' : '';
+  // Partes: vacío = 1 parte por defecto; se maneja con stepper (enteros ≥ 0).
+  const partsOf = (id: string) => {
+    const raw = values[id];
+    if (raw == null || raw.trim() === '') return 1;
+    return Math.max(0, Math.round(num(raw)));
+  };
+  const setParts = (id: string, n: number) => setValues(prev => ({ ...prev, [id]: String(Math.max(0, n)) }));
 
   const submit = async () => {
     if (!canSave) return;
@@ -114,24 +121,24 @@ export const AddExpenseSheet: React.FC<Props> = ({
         </div>
 
         <div className="px-5 pb-4 overflow-y-auto no-scrollbar">
-          <div className="text-center py-2">
+          <input
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="¿En qué fue? (p.ej. Cena, Taxi…)"
+            className="w-full mt-2 px-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-transparent outline-none focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+            autoFocus
+          />
+
+          <div className="text-center py-2 mt-2">
             <input
               value={amount}
               onChange={e => setAmount(e.target.value)}
               inputMode="decimal"
               placeholder="0,00"
               className="w-full text-center text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-600 bg-transparent"
-              autoFocus
             />
             <div className="text-xs text-zinc-400 dark:text-zinc-500 font-semibold mt-1">Importe ({currency})</div>
           </div>
-
-          <input
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="¿En qué fue? (p.ej. Cena, Taxi…)"
-            className="w-full mt-2 px-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-transparent outline-none focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
-          />
 
           <div className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mt-5 mb-2">Pagado por</div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -178,16 +185,24 @@ export const AddExpenseSheet: React.FC<Props> = ({
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>{initials(p.display_name)}</span>
                   <span className="flex-1 font-semibold text-zinc-900 dark:text-zinc-50 text-sm">{p.display_name}</span>
                   {on && needsInput && (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={values[p.id] ?? ''}
-                        onChange={e => setValues(prev => ({ ...prev, [p.id]: e.target.value }))}
-                        inputMode="decimal"
-                        placeholder={splitType === 'shares' ? '1' : '0'}
-                        className="w-14 text-right px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-zinc-900 dark:text-zinc-50"
-                      />
-                      <span className="text-xs text-zinc-400 dark:text-zinc-500 w-3">{inputSuffix}</span>
-                    </div>
+                    splitType === 'shares' ? (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setParts(p.id, partsOf(p.id) - 1)} disabled={partsOf(p.id) <= 0} className="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-300 disabled:opacity-30 active:scale-95"><Minus size={13} /></button>
+                        <span className="w-8 text-center text-sm font-bold text-zinc-900 dark:text-zinc-50 tabular-nums">{partsOf(p.id)}</span>
+                        <button onClick={() => setParts(p.id, partsOf(p.id) + 1)} className="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-300 active:scale-95"><Plus size={13} /></button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={values[p.id] ?? ''}
+                          onChange={e => setValues(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          inputMode="decimal"
+                          placeholder="0"
+                          className="w-14 text-right px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+                        />
+                        <span className="text-xs text-zinc-400 dark:text-zinc-500 w-3">{inputSuffix}</span>
+                      </div>
+                    )
                   )}
                   {on && <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50 w-16 text-right tabular-nums">{formatMoney(shareOf(p.id), currency)}</span>}
                 </div>

@@ -4,7 +4,7 @@ import { AVATAR_COLORS } from '../types';
 import { processImageFile } from '../services/imageProcessor';
 import { ocrReceipt } from '../services/ocr';
 import { formatMoney } from '../services/format';
-import { SplitLine, linesFromReceipt, linesTotal, unassignedUnits, allAssigned, totalsByParticipant } from '../services/itemSplit';
+import { SplitLine, linesFromReceipt, linesTotal, unassignedUnits, allAssigned, totalsByParticipant, lineShareFor, lineUnitsFor } from '../services/itemSplit';
 import { ItemAssigner } from './ItemAssigner';
 
 interface Person { id: string; name: string; color: string; }
@@ -180,6 +180,44 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-2">Resumen por persona</div>
+      <div className="space-y-2 mb-5">
+        {people.map(p => {
+          const items = lines
+            .map(l => ({ l, share: lineShareFor(l, p.id), units: lineUnitsFor(l, p.id) }))
+            .filter(x => x.share > 0.005);
+          const tot = totals[p.id] || 0;
+          const isPayer = p.id === payer;
+          return (
+            <div key={p.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${p.color}`}>{initials(p.name)}</span>
+                <span className="flex-1 font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                  {p.name}
+                  {isPayer && <span className="text-[9px] font-extrabold uppercase tracking-wide bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">Pagó</span>}
+                </span>
+                <span className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(tot)}</span>
+              </div>
+              {items.length === 0 ? (
+                <div className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-2 pl-11">No consumió nada</div>
+              ) : (
+                <div className="mt-2.5 pl-11 space-y-1">
+                  {items.map(({ l, share, units }) => (
+                    <div key={l.id} className="flex items-center justify-between text-[13px]">
+                      <span className="text-zinc-600 dark:text-zinc-300 min-w-0 truncate">
+                        {units > 1 && <span className="text-zinc-400 dark:text-zinc-500 font-semibold">{units}× </span>}
+                        {l.description || 'Producto'}
+                      </span>
+                      <span className="text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0 ml-2">{formatMoney(share)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-2">Quién debe a {payerName}</div>

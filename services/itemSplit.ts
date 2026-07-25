@@ -55,6 +55,15 @@ export function totalsByParticipant(lines: SplitLine[]): Record<string, number> 
   return t;
 }
 
+// Cuánto le toca a `pid` en una línea concreta (suma de sus unidades).
+export function lineShareFor(l: SplitLine, pid: string): number {
+  const up = unitPrice(l);
+  return r2(l.units.reduce((a, owners) => a + (owners.includes(pid) ? up / owners.length : 0), 0));
+}
+// Nº de unidades de la línea que consumió `pid` (para el "1× …").
+export const lineUnitsFor = (l: SplitLine, pid: string): number =>
+  l.units.filter(owners => owners.includes(pid)).length;
+
 export const linesTotal = (lines: SplitLine[]) => r2(lines.reduce((a, l) => a + l.price, 0));
 export const unassignedUnits = (lines: SplitLine[]) =>
   lines.reduce((a, l) => a + l.units.filter(u => u.length === 0).length, 0);
