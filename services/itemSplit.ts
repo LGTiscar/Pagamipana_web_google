@@ -22,15 +22,18 @@ export function linesFromReceipt(
   });
 }
 
-// Reconstruye líneas a partir de los ítems guardados de un gasto OCR (para editar).
-// Solo persistimos owner_ids (unión) por línea, así que restauramos un reparto
-// UNIFORME: cada unidad hereda esos owners. Suficiente para el caso habitual.
+// Reconstruye líneas a partir de los ítems guardados de un gasto OCR (para editar
+// y para el desglose). Si el ítem trae `units` (reparto fiel unidad-a-unidad) lo
+// usamos tal cual; si no (ítems antiguos), reconstruimos UNIFORME desde owner_ids.
 export function linesFromItems(
-  items: { id: string; description: string; quantity: number; unit_price: number; owner_ids: string[] }[],
+  items: { id: string; description: string; quantity: number; unit_price: number; owner_ids: string[]; units?: string[][] | null }[],
 ): SplitLine[] {
   return items.map(it => {
     const q = Math.max(1, Math.round(it.quantity) || 1);
-    return { id: it.id, description: it.description, quantity: q, price: r2(it.unit_price * q), units: Array.from({ length: q }, () => [...it.owner_ids]) };
+    const units = Array.isArray(it.units) && it.units.length === q
+      ? it.units.map(u => [...(u ?? [])])
+      : Array.from({ length: q }, () => [...it.owner_ids]);
+    return { id: it.id, description: it.description, quantity: q, price: r2(it.unit_price * q), units };
   });
 }
 
@@ -83,13 +86,15 @@ export function sharesFor(lines: SplitLine[]): { participant_id: string; amount:
   return out;
 }
 
-// Líneas para guardar (owner_ids = unión de owners de todas las unidades).
-export function itemsFor(lines: SplitLine[]): { description: string; quantity: number; unit_price: number; owner_ids: string[] }[] {
+// Líneas para guardar. `units` = reparto fiel por unidad (fuente de verdad);
+// `owner_ids` = unión derivada (compatibilidad / posibles filtros).
+export function itemsFor(lines: SplitLine[]): { description: string; quantity: number; unit_price: number; owner_ids: string[]; units: string[][] }[] {
   return lines.map(l => ({
     description: l.description,
     quantity: l.quantity,
     unit_price: r2(unitPrice(l)),
     owner_ids: Array.from(new Set(l.units.flat())),
+    units: l.units.map(u => [...u]),
   }));
 }
 

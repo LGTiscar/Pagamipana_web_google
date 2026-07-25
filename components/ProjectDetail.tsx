@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera, ChevronDown } from 'lucide-react';
 import { Participant, Project, Expense, Balance, Settlement, projectEmoji } from '../types';
 import { listParticipants, deleteProject } from '../services/projects';
 import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
-import { SplitLine, linesFromItems } from '../services/itemSplit';
+import { SplitLine, linesFromItems, totalsByParticipant, lineShareFor, lineUnitsFor } from '../services/itemSplit';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
 import { ScanExpenseSheet } from './ScanExpenseSheet';
@@ -43,6 +43,10 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [settleTarget, setSettleTarget] = useState<{ s: Settlement; idx: number } | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
+  // Desglose por-ítem de gastos de ticket (desplegable en la lista)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [itemsCache, setItemsCache] = useState<Record<string, SplitLine[]>>({});
+  const [loadingItemsId, setLoadingItemsId] = useState<string | null>(null);
 
   const cur = project.currency;
 
@@ -56,6 +60,8 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       setParticipants(pa);
       setExpenses(ex);
       setBalances(ba);
+      setItemsCache({});      // datos frescos: invalida el desglose cacheado
+      setExpandedId(null);
     } catch (e: any) {
       setError(e.message ?? 'No se pudo cargar el proyecto.');
     } finally {
@@ -81,6 +87,23 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const myNet = balances.find(b => b.participant_id === myParticipant?.id)?.net ?? 0;
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
   const maxAbs = useMemo(() => Math.max(1, ...balances.map(b => Math.abs(b.net))), [balances]);
+
+  // Despliega/pliega el desglose por-ítem de un gasto de ticket (carga perezosa).
+  const toggleExpand = async (e: Expense) => {
+    if (expandedId === e.id) { setExpandedId(null); return; }
+    setExpandedId(e.id);
+    if (!itemsCache[e.id]) {
+      setLoadingItemsId(e.id);
+      try {
+        const items = await listExpenseItems(e.id);
+        setItemsCache(prev => ({ ...prev, [e.id]: linesFromItems(items) }));
+      } catch (err: any) {
+        setError(err.message ?? 'No se pudo cargar el detalle del ticket.');
+      } finally {
+        setLoadingItemsId(null);
+      }
+    }
+  };
 
   // Abre el gasto en modo edición, cargando sus datos (shares o líneas del ticket).
   const openEdit = async (e: Expense) => {
@@ -199,27 +222,78 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             </div>
           ) : (
             <div className="space-y-2">
-              {expenses.map(e => (
-                <div key={e.id} className="group flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3">
-                  <div className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
-                    {e.source === 'ocr' ? <Receipt size={17} /> : <Pencil size={16} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">{e.description}</div>
-                    <div className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1.5">
-                      <span className={`text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${e.source === 'ocr' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
-                        {e.source === 'ocr' ? 'Ticket' : 'Manual'}
+              {expenses.map(e => {
+                const isOcr = e.source === 'ocr';
+                const open = expandedId === e.id;
+                return (
+                <div key={e.id} className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                  <div className="flex items-center gap-3 p-3">
+                    <button
+                      onClick={isOcr ? () => toggleExpand(e) : undefined}
+                      className={`flex items-center gap-3 flex-1 min-w-0 text-left ${isOcr ? '' : 'cursor-default'}`}
+                    >
+                      <span className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+                        {isOcr ? <Receipt size={17} /> : <Pencil size={16} />}
                       </span>
-                      Pagó {nameOf(e.paid_by)}
-                    </div>
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">{e.description}</span>
+                        <span className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1.5">
+                          <span className={`text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${isOcr ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
+                            {isOcr ? 'Ticket' : 'Manual'}
+                          </span>
+                          Pagó {nameOf(e.paid_by)}
+                        </span>
+                      </span>
+                    </button>
+                    <div className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
+                    {isOcr && (
+                      <button onClick={() => toggleExpand(e)} className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 shrink-0" aria-label={open ? 'Ocultar detalle' : 'Ver detalle'}>
+                        {loadingItemsId === e.id ? <Loader2 size={15} className="animate-spin" /> : <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />}
+                      </button>
+                    )}
+                    <button onClick={() => openEdit(e)} disabled={openingId === e.id} className="text-zinc-300 dark:text-zinc-600 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 disabled:opacity-50" aria-label="Editar gasto">
+                      {openingId === e.id ? <Loader2 size={16} className="animate-spin" /> : <Pencil size={15} />}
+                    </button>
+                    <button onClick={() => setConfirmExpense(e)} className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
                   </div>
-                  <div className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
-                  <button onClick={() => openEdit(e)} disabled={openingId === e.id} className="text-zinc-300 dark:text-zinc-600 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 disabled:opacity-50" aria-label="Editar gasto">
-                    {openingId === e.id ? <Loader2 size={16} className="animate-spin" /> : <Pencil size={15} />}
-                  </button>
-                  <button onClick={() => setConfirmExpense(e)} className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
+
+                  {isOcr && open && itemsCache[e.id] && (
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-950/40 px-3 py-2.5 space-y-2.5">
+                      {(() => {
+                        const lines = itemsCache[e.id];
+                        const totals = totalsByParticipant(lines);
+                        const consumers = participants.filter(p => (totals[p.id] || 0) > 0.005);
+                        if (consumers.length === 0) return <div className="text-[11px] text-zinc-400 dark:text-zinc-500">Sin detalle de productos.</div>;
+                        return consumers.map(p => {
+                          const its = lines
+                            .map(l => ({ l, share: lineShareFor(l, p.id), units: lineUnitsFor(l, p.id) }))
+                            .filter(x => x.share > 0.005);
+                          return (
+                            <div key={p.id}>
+                              <div className="flex items-center gap-2">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${colorOf(p.id)}`}>{initials(nameOf(p.id))}</span>
+                                <span className="flex-1 text-sm font-bold text-zinc-800 dark:text-zinc-100">{nameOf(p.id)}</span>
+                                <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(totals[p.id], cur)}</span>
+                              </div>
+                              <div className="pl-8 mt-1 space-y-0.5">
+                                {its.map(({ l, share, units }) => (
+                                  <div key={l.id} className="flex items-center justify-between text-[12px]">
+                                    <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
+                                      {units > 1 && <span className="font-semibold">{units}× </span>}{l.description || 'Producto'}
+                                    </span>
+                                    <span className="text-zinc-400 dark:text-zinc-500 tabular-nums shrink-0 ml-2">{formatMoney(share, cur)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )
         ) : tab === 'balances' ? (

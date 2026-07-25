@@ -40,7 +40,7 @@ export async function addOcrExpense(input: {
   amount: number;
   paidBy: string;
   shares: { participant_id: string; amount: number }[];
-  items: { description: string; quantity: number; unit_price: number; owner_ids: string[] }[];
+  items: { description: string; quantity: number; unit_price: number; owner_ids: string[]; units: string[][] }[];
 }): Promise<Expense> {
   const { data, error } = await supabase.rpc('add_ocr_expense', {
     p_project_id: input.projectId,
@@ -82,7 +82,7 @@ export async function updateOcrExpense(input: {
   amount: number;
   paidBy: string;
   shares: { participant_id: string; amount: number }[];
-  items: { description: string; quantity: number; unit_price: number; owner_ids: string[] }[];
+  items: { description: string; quantity: number; unit_price: number; owner_ids: string[]; units: string[][] }[];
 }): Promise<Expense> {
   const { data, error } = await supabase.rpc('update_ocr_expense', {
     p_expense_id: input.id,
@@ -111,10 +111,10 @@ export async function listExpenseShares(
 // Líneas del ticket de un gasto OCR (para prefilar la edición).
 export async function listExpenseItems(
   expenseId: string,
-): Promise<{ id: string; description: string; quantity: number; unit_price: number; owner_ids: string[] }[]> {
+): Promise<{ id: string; description: string; quantity: number; unit_price: number; owner_ids: string[]; units: string[][] | null }[]> {
   const { data, error } = await supabase
     .from('expense_items')
-    .select('id, description, quantity, unit_price, owner_ids')
+    .select('id, description, quantity, unit_price, owner_ids, units')
     .eq('expense_id', expenseId);
   if (error) throw error;
   return (data ?? []).map((it: any) => ({
@@ -123,6 +123,7 @@ export async function listExpenseItems(
     quantity: Number(it.quantity),
     unit_price: Number(it.unit_price),
     owner_ids: (it.owner_ids ?? []) as string[],
+    units: (it.units ?? null) as string[][] | null,
   }));
 }
 

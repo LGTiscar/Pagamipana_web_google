@@ -48,7 +48,8 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
 
 ## Modelo de datos (Supabase)
 Tablas: `profiles`, `projects`, `participants` (¡`profile_id` NULL = participante sin cuenta!),
-`expenses`, `expense_shares` (canónico para balances), `expense_items` (detalle OCR), `settlements`.
+`expenses`, `expense_shares` (canónico para balances), `expense_items` (detalle OCR; `units jsonb` =
+reparto fiel por unidad, `owner_ids` = unión derivada), `settlements`.
 RPCs: `create_project`, `join_project`, `add_expense`, `add_ocr_expense`, `get_balances`,
 `list_projects_overview(p_include_archived)`. RLS gira en torno a `is_project_member(project_id)`.
 Archivar = `projects.archived_at`.
@@ -58,7 +59,8 @@ Archivar = `projects.archived_at`.
 add_expense/get_balances) · `0003` join_project · `0004` list_projects_overview · `0005` expense_items +
 add_ocr_expense · `0006` settlements (+ balances con liquidaciones) · `0007` archivar (overview con
 `archived_at` + filtro) · `0008` limpieza de anónimos (`pg_cron`) · `0009` editar gastos
-(`update_expense` / `update_ocr_expense`).
+(`update_expense` / `update_ocr_expense`) · `0010` reparto por-unidad fiel en tickets
+(`expense_items.units jsonb` + add/update_ocr_expense la persisten; retrocompatible con units NULL).
 **Al crear una migración nueva, recuérdale al usuario que la ejecute.**
 
 ## Convenciones
