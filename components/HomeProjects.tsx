@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Loader2, LogOut, MoreVertical, Trash2, Archive, ChevronDown, ChevronRight, DoorOpen } from 'lucide-react';
+import { Plus, Loader2, LogOut, MoreVertical, Trash2, Archive, ChevronDown, ChevronRight, DoorOpen, Pencil } from 'lucide-react';
 import { Project, ProjectOverview, projectEmoji } from '../types';
 import { listProjectsOverview, deleteProject, archiveProject, leaveProject } from '../services/projects';
 import { formatMoney } from '../services/format';
@@ -35,6 +35,10 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [showEditName, setShowEditName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +72,24 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
     setMenuFor(null);
     try { await archiveProject(o.id, archived); await load(); }
     catch (e: any) { setError(e.message ?? 'No se pudo archivar.'); }
+  };
+
+  const openEditName = () => {
+    setShowMenu(false);
+    setNameDraft(auth.displayName ?? '');
+    setNameError(null);
+    setShowEditName(true);
+  };
+
+  const doSaveName = async () => {
+    if (!nameDraft.trim()) return;
+    setSavingName(true);
+    setNameError(null);
+    const { error } = await auth.saveName(nameDraft.trim());
+    setSavingName(false);
+    if (error) { setNameError(error.message ?? 'No se pudo guardar el nombre.'); return; }
+    setShowEditName(false);
+    load(); // refresca avatares/nombres en las tarjetas
   };
 
   const doLeave = async () => {
@@ -190,8 +212,12 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
                   <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl z-20 overflow-hidden">
                     <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
                       <div className="text-[11px] text-zinc-400 dark:text-zinc-500 font-semibold">Sesión iniciada</div>
-                      <div className="text-sm font-bold text-zinc-900 dark:text-zinc-50 truncate">{auth.user?.email ?? auth.displayName ?? 'Cuenta'}</div>
+                      <div className="text-sm font-bold text-zinc-900 dark:text-zinc-50 truncate">{auth.displayName ?? auth.user?.email ?? 'Cuenta'}</div>
+                      {auth.user?.email && <div className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">{auth.user.email}</div>}
                     </div>
+                    <button onClick={openEditName} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800">
+                      <Pencil size={16} /> Editar mi nombre
+                    </button>
                     <button onClick={async () => { setShowMenu(false); await auth.signOut(); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40">
                       <LogOut size={16} /> Cerrar sesión
                     </button>
@@ -280,6 +306,28 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
             <div className="flex gap-3 mt-5">
               <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
               <button onClick={doDelete} disabled={deleting} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deleting ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditName && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => !savingName && setShowEditName(false)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Tu nombre</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Así te ven tus panas en los proyectos. Se actualiza en todos.</p>
+            <input
+              value={nameDraft}
+              onChange={e => setNameDraft(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && doSaveName()}
+              placeholder="Tu nombre"
+              autoFocus
+              className="w-full mt-4 px-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-transparent outline-none focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+            />
+            {nameError && <p className="text-sm text-red-500 dark:text-red-400 mt-2">{nameError}</p>}
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowEditName(false)} disabled={savingName} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={doSaveName} disabled={savingName || !nameDraft.trim()} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{savingName ? 'Guardando…' : 'Guardar'}</button>
             </div>
           </div>
         </div>

@@ -67,7 +67,8 @@ add_ocr_expense · `0006` settlements (+ balances con liquidaciones) · `0007` a
 `0011` reclamar participante al unirse (`list_joinable_participants` / `claim_participant`) ·
 `0012` borrado solo del creador (`overview.created_by`), salir del proyecto (`leave_project`, solo
 no-creador y sin huella económica) y archivado PERSONAL (`project_archives` + `set_project_archived`;
-el overview usa este estado por-usuario en vez de `projects.archived_at`).
+el overview usa este estado por-usuario en vez de `projects.archived_at`) · `0013` elegir/editar nombre
+(`update_my_name`: actualiza `profiles.display_name` y mis `participants.display_name` en todos los proyectos).
 **Al crear una migración nueva, recuérdale al usuario que la ejecute.**
 
 ## Convenciones

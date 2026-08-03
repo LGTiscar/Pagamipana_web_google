@@ -91,11 +91,13 @@ export function useAuth() {
     return () => { active = false; };
   }, [session?.user?.id]);
 
+  // Fija el nombre visible: actualiza el perfil y mis participantes en todos los
+  // proyectos (RPC), para que el nombre sea coherente en toda la app y la BD.
   const saveName = useCallback(async (name: string) => {
     const uid = session?.user?.id;
     if (!uid) return { error: new Error('No autenticado') as any };
-    const { error } = await supabase.from('profiles').update({ display_name: name }).eq('id', uid);
-    if (!error) setProfileName(name);
+    const { error } = await supabase.rpc('update_my_name', { p_name: name });
+    if (!error) setProfileName(name.trim());
     return { error };
   }, [session?.user?.id]);
 
