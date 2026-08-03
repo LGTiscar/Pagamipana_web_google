@@ -3,7 +3,7 @@ import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Came
 import { Participant, Project, Expense, Balance, Settlement, projectEmoji } from '../types';
 import { listParticipants, deleteProject, leaveProject } from '../services/projects';
 import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
-import { SplitLine, linesFromItems, totalsByParticipant, lineShareFor, lineUnitsFor } from '../services/itemSplit';
+import { SplitLine, linesFromItems, totalsByParticipant, lineShareFor, unitsLabel } from '../services/itemSplit';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
 import { ScanExpenseSheet } from './ScanExpenseSheet';
@@ -282,7 +282,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                         if (consumers.length === 0) return <div className="text-[11px] text-zinc-400 dark:text-zinc-500">Sin detalle de productos.</div>;
                         return consumers.map(p => {
                           const its = lines
-                            .map(l => ({ l, share: lineShareFor(l, p.id), units: lineUnitsFor(l, p.id) }))
+                            .map(l => ({ l, share: lineShareFor(l, p.id) }))
                             .filter(x => x.share > 0.005);
                           return (
                             <div key={p.id}>
@@ -292,10 +292,10 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                                 <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(totals[p.id], cur)}</span>
                               </div>
                               <div className="pl-8 mt-1 space-y-0.5">
-                                {its.map(({ l, share, units }) => (
+                                {its.map(({ l, share }) => (
                                   <div key={l.id} className="flex items-center justify-between text-[12px]">
                                     <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
-                                      {units > 1 && <span className="font-semibold">{units}× </span>}{l.description || 'Producto'}
+                                      <span className="font-semibold">{unitsLabel(l, p.id)}</span>{l.description || 'Producto'}
                                     </span>
                                     <span className="text-zinc-400 dark:text-zinc-500 tabular-nums shrink-0 ml-2">{formatMoney(share, cur)}</span>
                                   </div>

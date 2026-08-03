@@ -67,6 +67,19 @@ export function lineShareFor(l: SplitLine, pid: string): number {
 export const lineUnitsFor = (l: SplitLine, pid: string): number =>
   l.units.filter(owners => owners.includes(pid)).length;
 
+// Unidades EFECTIVAS de `pid` en una línea: cada unidad compartida cuenta su
+// fracción (2 cañas a medias → 1 efectiva). Es lo que la persona consumió de verdad.
+export const lineUnitsForEffective = (l: SplitLine, pid: string): number =>
+  l.units.reduce((a, owners) => a + (owners.includes(pid) ? 1 / owners.length : 0), 0);
+
+// Prefijo "N× " para el desglose por persona: solo si consumió un nº entero > 1 de
+// unidades (p. ej. 2 croquetas para él solo). Compartidas o fracciones → sin prefijo.
+export function unitsLabel(l: SplitLine, pid: string): string {
+  const q = lineUnitsForEffective(l, pid);
+  const r = Math.round(q);
+  return Math.abs(q - r) < 0.01 && r > 1 ? `${r}× ` : '';
+}
+
 export const linesTotal = (lines: SplitLine[]) => r2(lines.reduce((a, l) => a + l.price, 0));
 export const unassignedUnits = (lines: SplitLine[]) =>
   lines.reduce((a, l) => a + l.units.filter(u => u.length === 0).length, 0);

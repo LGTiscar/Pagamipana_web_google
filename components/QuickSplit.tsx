@@ -4,7 +4,7 @@ import { AVATAR_COLORS } from '../types';
 import { processImageFile } from '../services/imageProcessor';
 import { ocrReceipt } from '../services/ocr';
 import { formatMoney } from '../services/format';
-import { SplitLine, linesFromReceipt, linesTotal, unassignedUnits, allAssigned, totalsByParticipant, lineShareFor, lineUnitsFor } from '../services/itemSplit';
+import { SplitLine, linesFromReceipt, linesTotal, unassignedUnits, allAssigned, totalsByParticipant, lineShareFor, unitsLabel } from '../services/itemSplit';
 import { ItemAssigner } from './ItemAssigner';
 
 interface Person { id: string; name: string; color: string; }
@@ -75,7 +75,7 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
   const share = async () => {
     const itemsFor = (pid: string) => lines
-      .map(l => ({ l, amt: lineShareFor(l, pid), units: lineUnitsFor(l, pid) }))
+      .map(l => ({ l, amt: lineShareFor(l, pid) }))
       .filter(x => x.amt > 0.005);
 
     let text = `🧾 PagaMiPana · Reparto rápido\nTotal: ${formatMoney(total)} · Pagó ${payerName}\n`;
@@ -85,7 +85,7 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       text += `\n${p.name}${p.id === payer ? ' (pagó)' : ''} — ${formatMoney(totals[p.id] || 0)}`;
       const its = itemsFor(p.id);
       if (its.length === 0) text += `\n  · (nada)`;
-      else its.forEach(({ l, amt, units }) => { text += `\n  · ${units > 1 ? units + '× ' : ''}${l.description || 'Producto'}: ${formatMoney(amt)}`; });
+      else its.forEach(({ l, amt }) => { text += `\n  · ${unitsLabel(l, p.id)}${l.description || 'Producto'}: ${formatMoney(amt)}`; });
     });
 
     text += debts.length
@@ -202,7 +202,7 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       <div className="space-y-2 mb-5">
         {people.map(p => {
           const items = lines
-            .map(l => ({ l, share: lineShareFor(l, p.id), units: lineUnitsFor(l, p.id) }))
+            .map(l => ({ l, share: lineShareFor(l, p.id) }))
             .filter(x => x.share > 0.005);
           const tot = totals[p.id] || 0;
           const isPayer = p.id === payer;
@@ -220,10 +220,10 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                 <div className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-2 pl-11">No consumió nada</div>
               ) : (
                 <div className="mt-2.5 pl-11 space-y-1">
-                  {items.map(({ l, share, units }) => (
+                  {items.map(({ l, share }) => (
                     <div key={l.id} className="flex items-center justify-between text-[13px]">
                       <span className="text-zinc-600 dark:text-zinc-300 min-w-0 truncate">
-                        {units > 1 && <span className="text-zinc-400 dark:text-zinc-500 font-semibold">{units}× </span>}
+                        <span className="text-zinc-400 dark:text-zinc-500 font-semibold">{unitsLabel(l, p.id)}</span>
                         {l.description || 'Producto'}
                       </span>
                       <span className="text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0 ml-2">{formatMoney(share)}</span>

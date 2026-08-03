@@ -42,12 +42,18 @@ export const ItemAssigner: React.FC<Props> = ({ people, lines, setLines, currenc
     setPriceVal('0.00');
   };
 
-  const avatar = (pid: string, name: string, on: boolean, onClick: () => void, offsetClass = 'dark:ring-offset-zinc-900') => (
+  // Chip con avatar + NOMBRE completo (evita confundir iniciales, p. ej. Ana/Andrea).
+  const avatar = (pid: string, name: string, on: boolean, onClick: () => void) => (
     <button
       onClick={onClick}
       title={name}
-      className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${colorOf(pid)} ${on ? `ring-2 ring-blue-600 ring-offset-1 ring-offset-white ${offsetClass}` : 'opacity-30'}`}
-    >{initials(name)}</button>
+      className={`flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 border transition-all ${
+        on ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40' : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 opacity-70'
+      }`}
+    >
+      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${colorOf(pid)}`}>{initials(name)}</span>
+      <span className={`text-xs font-semibold whitespace-nowrap ${on ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400'}`}>{name}</span>
+    </button>
   );
 
   return (
@@ -163,7 +169,7 @@ export const ItemAssigner: React.FC<Props> = ({ people, lines, setLines, currenc
                           </span>
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                          {people.map(p => avatar(p.id, p.name, uOwners.includes(p.id), () => update(l.id, x => toggleUnit(x, idx, p.id)), 'dark:ring-offset-zinc-800'))}
+                          {people.map(p => avatar(p.id, p.name, uOwners.includes(p.id), () => update(l.id, x => toggleUnit(x, idx, p.id))))}
                         </div>
                       </div>
                     ))}
