@@ -21,6 +21,7 @@ export async function listProjectsOverview(includeArchived = false): Promise<Pro
     type: r.type,
     currency: r.currency,
     created_at: r.created_at,
+    created_by: r.created_by,
     archived_at: r.archived_at ?? null,
     my_net: Number(r.my_net),
     member_count: Number(r.member_count),
@@ -28,12 +29,16 @@ export async function listProjectsOverview(includeArchived = false): Promise<Pro
   })) as ProjectOverview[];
 }
 
-// Archiva / desarchiva un proyecto (RLS: solo miembros).
+// Archiva / desarchiva un proyecto SOLO para el usuario actual (estado personal).
 export async function archiveProject(id: string, archived: boolean): Promise<void> {
-  const { error } = await supabase
-    .from('projects')
-    .update({ archived_at: archived ? new Date().toISOString() : null })
-    .eq('id', id);
+  const { error } = await supabase.rpc('set_project_archived', { p_project_id: id, p_archived: archived });
+  if (error) throw error;
+}
+
+// Salir de un proyecto (quitarme como participante). El RPC solo lo permite a
+// no-creadores y sin huella económica (nada pagado / ninguna parte / liquidación).
+export async function leaveProject(id: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_project', { p_project_id: id });
   if (error) throw error;
 }
 

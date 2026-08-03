@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Loader2, LogOut, MoreVertical, Trash2, Archive, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Loader2, LogOut, MoreVertical, Trash2, Archive, ChevronDown, ChevronRight, DoorOpen } from 'lucide-react';
 import { Project, ProjectOverview, projectEmoji } from '../types';
-import { listProjectsOverview, deleteProject, archiveProject } from '../services/projects';
+import { listProjectsOverview, deleteProject, archiveProject, leaveProject } from '../services/projects';
 import { formatMoney } from '../services/format';
 import { UseAuth } from '../hooks/useAuth';
 import { CreateProjectSheet } from './CreateProjectSheet';
@@ -17,7 +17,7 @@ const initials = (n: string) => n.trim().charAt(0).toUpperCase() || '?';
 
 const toProject = (o: ProjectOverview): Project => ({
   id: o.id, name: o.name, type: o.type, currency: o.currency,
-  created_at: o.created_at, created_by: '', archived_at: o.archived_at,
+  created_at: o.created_at, created_by: o.created_by, archived_at: o.archived_at,
 });
 
 export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
@@ -31,6 +31,9 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectOverview | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState<ProjectOverview | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
 
   const load = useCallback(async () => {
@@ -65,6 +68,21 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
     setMenuFor(null);
     try { await archiveProject(o.id, archived); await load(); }
     catch (e: any) { setError(e.message ?? 'No se pudo archivar.'); }
+  };
+
+  const doLeave = async () => {
+    if (!leaveTarget) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await leaveProject(leaveTarget.id);
+      setLeaveTarget(null);
+      await load();
+    } catch (e: any) {
+      setLeaveError(e.message ?? 'No se pudo salir del proyecto.');
+    } finally {
+      setLeaving(false);
+    }
   };
 
   const active = projects.filter(p => !p.archived_at);
@@ -116,9 +134,15 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
               <button onClick={() => doArchive(o, !isArchived)} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">
                 <Archive size={16} /> {isArchived ? 'Desarchivar' : 'Archivar'}
               </button>
-              <button onClick={() => { setMenuFor(null); setDeleteTarget(o); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border-t border-zinc-100 dark:border-zinc-800">
-                <Trash2 size={16} /> Eliminar proyecto
-              </button>
+              {o.created_by === auth.user?.id ? (
+                <button onClick={() => { setMenuFor(null); setDeleteTarget(o); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border-t border-zinc-100 dark:border-zinc-800">
+                  <Trash2 size={16} /> Eliminar proyecto
+                </button>
+              ) : (
+                <button onClick={() => { setMenuFor(null); setLeaveError(null); setLeaveTarget(o); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border-t border-zinc-100 dark:border-zinc-800">
+                  <DoorOpen size={16} /> Salir del proyecto
+                </button>
+              )}
             </div>
           </>
         )}
@@ -256,6 +280,20 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
             <div className="flex gap-3 mt-5">
               <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
               <button onClick={doDelete} disabled={deleting} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deleting ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {leaveTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => !leaving && setLeaveTarget(null)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Salir de «{leaveTarget.name}»?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Dejarás de ver este proyecto. Solo puedes salir si no tienes gastos ni saldo pendiente en él.</p>
+            {leaveError && <p className="text-sm text-red-500 dark:text-red-400 mt-3">{leaveError}</p>}
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setLeaveTarget(null)} disabled={leaving} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={doLeave} disabled={leaving} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{leaving ? 'Saliendo…' : 'Salir'}</button>
             </div>
           </div>
         </div>

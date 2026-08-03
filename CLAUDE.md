@@ -54,7 +54,8 @@ Tablas: `profiles`, `projects`, `participants` (¡`profile_id` NULL = participan
 reparto fiel por unidad, `owner_ids` = unión derivada), `settlements`.
 RPCs: `create_project`, `join_project`, `add_expense`, `add_ocr_expense`, `get_balances`,
 `list_projects_overview(p_include_archived)`. RLS gira en torno a `is_project_member(project_id)`.
-Archivar = `projects.archived_at`.
+Archivar es **personal** (`project_archives(project_id, profile_id)`); `projects.archived_at` quedó
+obsoleto. Borrar proyecto = solo el creador (RLS); el resto usa `leave_project` (salir).
 
 ### Migraciones (`supabase/migrations/`) — se corren A MANO en el SQL Editor de Supabase
 `0001` base (profiles/projects/participants + RLS + create_project) · `0002` gastos (expenses/shares +
@@ -63,7 +64,10 @@ add_ocr_expense · `0006` settlements (+ balances con liquidaciones) · `0007` a
 `archived_at` + filtro) · `0008` limpieza de anónimos (`pg_cron`) · `0009` editar gastos
 (`update_expense` / `update_ocr_expense`) · `0010` reparto por-unidad fiel en tickets
 (`expense_items.units jsonb` + add/update_ocr_expense la persisten; retrocompatible con units NULL) ·
-`0011` reclamar participante al unirse (`list_joinable_participants` / `claim_participant`).
+`0011` reclamar participante al unirse (`list_joinable_participants` / `claim_participant`) ·
+`0012` borrado solo del creador (`overview.created_by`), salir del proyecto (`leave_project`, solo
+no-creador y sin huella económica) y archivado PERSONAL (`project_archives` + `set_project_archived`;
+el overview usa este estado por-usuario en vez de `projects.archived_at`).
 **Al crear una migración nueva, recuérdale al usuario que la ejecute.**
 
 ## Convenciones

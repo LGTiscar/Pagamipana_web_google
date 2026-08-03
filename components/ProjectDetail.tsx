@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera, ChevronDown } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera, ChevronDown, DoorOpen } from 'lucide-react';
 import { Participant, Project, Expense, Balance, Settlement, projectEmoji } from '../types';
-import { listParticipants, deleteProject } from '../services/projects';
+import { listParticipants, deleteProject, leaveProject } from '../services/projects';
 import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
 import { SplitLine, linesFromItems, totalsByParticipant, lineShareFor, lineUnitsFor } from '../services/itemSplit';
 import { formatMoney } from '../services/format';
@@ -32,6 +32,10 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [fabOpen, setFabOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const isCreator = !!project.created_by && project.created_by === myProfileId;
   // Edición de gastos (prefill cargado de BD)
   const [editManual, setEditManual] = useState<{ expense: Expense; shares: { participant_id: string; amount: number }[] } | null>(null);
   const [editOcr, setEditOcr] = useState<{ expense: Expense; lines: SplitLine[] } | null>(null);
@@ -170,6 +174,18 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       setError(e.message ?? 'No se pudo eliminar el proyecto.');
       setDeleting(false);
       setConfirmDelete(false);
+    }
+  };
+
+  const doLeave = async () => {
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await leaveProject(project.id);
+      onBack();
+    } catch (e: any) {
+      setLeaveError(e.message ?? 'No se pudo salir del proyecto.');
+      setLeaving(false);
     }
   };
 
@@ -349,12 +365,21 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
               participants={participants}
               onAdded={p => { setParticipants(prev => [...prev, p]); getBalances(project.id).then(setBalances).catch(() => {}); }}
             />
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="w-full mt-6 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-bold border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 rounded-2xl py-3 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all"
-            >
-              <Trash2 size={16} /> Eliminar proyecto
-            </button>
+            {isCreator ? (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="w-full mt-6 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-bold border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 rounded-2xl py-3 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all"
+              >
+                <Trash2 size={16} /> Eliminar proyecto
+              </button>
+            ) : (
+              <button
+                onClick={() => { setLeaveError(null); setConfirmLeave(true); }}
+                className="w-full mt-6 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-bold border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 rounded-2xl py-3 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all"
+              >
+                <DoorOpen size={16} /> Salir del proyecto
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -485,6 +510,20 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             <div className="flex gap-3">
               <button onClick={() => setSettleTarget(null)} disabled={settling} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
               <button onClick={doSettle} disabled={settling || num(settleAmount) <= 0} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{settling ? 'Guardando…' : 'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmLeave && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => !leaving && setConfirmLeave(false)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Salir de «{project.name}»?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Dejarás de ver este proyecto. Solo puedes salir si no tienes gastos ni saldo pendiente en él.</p>
+            {leaveError && <p className="text-sm text-red-500 dark:text-red-400 mt-3">{leaveError}</p>}
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirmLeave(false)} disabled={leaving} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={doLeave} disabled={leaving} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{leaving ? 'Saliendo…' : 'Salir'}</button>
             </div>
           </div>
         </div>
