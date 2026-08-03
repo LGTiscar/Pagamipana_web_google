@@ -22,6 +22,9 @@ export const CreateProjectSheet: React.FC<Props> = ({ onClose, onCreated, defaul
 
   const submit = async () => {
     if (!name.trim() || !yourName.trim()) return;
+    // Cierra el teclado antes de navegar al paso de invitar (si no, en móvil se
+    // arrastra y tapa el QR y las opciones del nuevo proyecto).
+    (document.activeElement as HTMLElement | null)?.blur();
     setSaving(true);
     setError(null);
     try {
@@ -49,7 +52,7 @@ export const CreateProjectSheet: React.FC<Props> = ({ onClose, onCreated, defaul
         </div>
 
         <label className={labelCls}>Tu nombre</label>
-        <input value={yourName} onChange={e => setYourName(e.target.value)} placeholder="¿Cómo te llamas?" className={inputCls} autoFocus={!defaultName} />
+        <input value={yourName} onChange={e => setYourName(e.target.value)} placeholder="¿Cómo te llamas?" className={inputCls} />
 
         <label className={labelCls}>Nombre del proyecto</label>
         <input
@@ -58,7 +61,6 @@ export const CreateProjectSheet: React.FC<Props> = ({ onClose, onCreated, defaul
           onKeyDown={e => e.key === 'Enter' && submit()}
           placeholder="Viaje a Lisboa"
           className={inputCls}
-          autoFocus={!!defaultName}
         />
 
         <label className={labelCls}>Tipo</label>

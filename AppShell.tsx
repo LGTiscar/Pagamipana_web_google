@@ -17,9 +17,21 @@ export default function AppShell() {
   const [quickMode, setQuickMode] = useState(false);
   const [openProject, setOpenProject] = useState<Project | null>(null);
   const [peopleStep, setPeopleStep] = useState(false);
-  const [pendingJoin, setPendingJoin] = useState<string | null>(
-    () => new URLSearchParams(window.location.search).get('join'),
-  );
+  // Persistimos la invitación en sessionStorage: al crear cuenta con Google/Apple/
+  // magic-link hay un redirect que borra `?join=…` de la URL; así sobrevive y la
+  // unión se completa al volver, sin tener que reabrir el enlace (bug alpha).
+  const JOIN_KEY = 'pmp_pending_join';
+  const [pendingJoin, setPendingJoin] = useState<string | null>(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('join');
+    const val = fromUrl ?? sessionStorage.getItem(JOIN_KEY);
+    if (val) sessionStorage.setItem(JOIN_KEY, val);
+    return val;
+  });
+
+  const clearPendingJoin = () => {
+    sessionStorage.removeItem(JOIN_KEY);
+    setPendingJoin(null);
+  };
 
   const stripJoin = () => {
     const params = new URLSearchParams(window.location.search);
@@ -49,8 +61,8 @@ export default function AppShell() {
       <JoinScreen
         projectId={pendingJoin}
         auth={auth}
-        onJoined={p => { setOpenProject(p); setPeopleStep(false); setPendingJoin(null); stripJoin(); }}
-        onCancel={() => { setPendingJoin(null); stripJoin(); }}
+        onJoined={p => { setOpenProject(p); setPeopleStep(false); clearPendingJoin(); stripJoin(); }}
+        onCancel={() => { clearPendingJoin(); stripJoin(); }}
       />
     );
   }

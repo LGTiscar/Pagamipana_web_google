@@ -65,6 +65,31 @@ export async function joinProject(id: string, displayName?: string): Promise<Pro
   return data as Project;
 }
 
+// Participantes sin cuenta (reclamables) de un proyecto, para el flujo de unión.
+// Vía RPC SECURITY DEFINER porque aún no somos miembros (RLS nos bloquearía).
+export async function listJoinableParticipants(
+  projectId: string,
+): Promise<{ id: string; display_name: string; color: string | null }[]> {
+  const { data, error } = await supabase.rpc('list_joinable_participants', { p_project_id: projectId });
+  if (error) throw error;
+  return (data ?? []) as { id: string; display_name: string; color: string | null }[];
+}
+
+// Identificarse como un participante existente sin cuenta (vincula tu profile_id).
+export async function claimParticipant(
+  projectId: string,
+  participantId: string,
+  displayName?: string,
+): Promise<Project> {
+  const { data, error } = await supabase.rpc('claim_participant', {
+    p_project_id: projectId,
+    p_participant_id: participantId,
+    p_display_name: displayName ?? null,
+  });
+  if (error) throw error;
+  return data as Project;
+}
+
 // Elimina el proyecto (cascada: participantes, gastos y shares). RLS: solo el creador.
 export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase.from('projects').delete().eq('id', id);
