@@ -39,7 +39,8 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
   (`continueAsGuest`). Ascenso a cuenta con Google (`linkGoogle`/`signInGoogle`, con fallback a sign-in si el
   email ya existe) o magic-link (`signInEmail`/`linkEmail`). `saveName`/`profileName`/`displayName` gestionan
   el nombre visible (perfil).
-- **`services/`**: `supabaseClient`, `projects`, `expenses`, `ocr`, `itemSplit` (lógica de reparto por
+- **`services/`**: `supabaseClient` (cliente + `withJwtRetry`: reintenta una vez los errores de JWT,
+  p.ej. `JWT issued at future` por desfase de reloj), `projects`, `expenses`, `ocr`, `itemSplit` (lógica de reparto por
   unidades), `format` (moneda), `currencies` (ISO 4217 vía `Intl`), `imageProcessor` (normaliza/HEIC→JPEG).
 - **`components/`** (nuevo diseño): `LoginScreen`, `JoinScreen`, `HomeProjects`, `ProjectDetail`
   (pestañas **Gastos · Balances · Miembros**), `CreateProjectSheet`, `AddExpenseSheet`, `ScanExpenseSheet`

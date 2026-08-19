@@ -27,13 +27,26 @@ def verify_supabase_jwt(auth_header: str) -> dict:
     key = _jwks.get_signing_key_from_jwt(token).key
     # aud='authenticated' cubre también a los usuarios anónimos (es lo que queremos:
     # solo exigir un token válido emitido por Supabase, no bloquear invitados).
-    return jwt.decode(token, key, algorithms=["ES256", "RS256"], audience="authenticated")
+    # leeway=30: margen de reloj. PyJWT valida `iat`/`exp` sin tolerancia y un
+    # desfase de segundos entre el reloj de Supabase y el del Lambda tumbaría
+    # tokens recién emitidos (ImmatureSignatureError, "The token is not yet valid").
+    return jwt.decode(
+        token, key,
+        algorithms=["ES256", "RS256"],
+        audience="authenticated",
+        leeway=30,
+    )
 
 # Si tu proyecto aún usa el secreto JWT clásico (HS256), en vez de lo anterior:
-#   jwt.decode(token, os.environ["SUPABASE_JWT_SECRET"], algorithms=["HS256"], audience="authenticated")
+#   jwt.decode(token, os.environ["SUPABASE_JWT_SECRET"], algorithms=["HS256"],
+#              audience="authenticated", leeway=30)
 ```
 - En el handler: lee la cabecera `Authorization`, llama a `verify_supabase_jwt`; si lanza, responde **401**.
 - Variables del Lambda: `SUPABASE_URL` (y `SUPABASE_JWT_SECRET` solo si usas HS256). **Nunca** en el frontend.
+- **Margen de reloj**: mantén `leeway=30` (y no lo bajes). Sin margen, cualquier desfase entre el
+  reloj del Lambda y el de Supabase rechaza tokens válidos justo después del login — el mismo
+  fallo que PostgREST reporta como `JWT issued at future` (mitigado en el cliente con
+  `withJwtRetry` en `services/supabaseClient.ts`).
 - **CORS**: restringe a `https://www.pagamipana.com` y `http://localhost:5173` (en vez de `*`).
 - Opcional: límite de tamaño de imagen y throttling en el Lambda.
 
