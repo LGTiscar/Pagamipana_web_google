@@ -29,7 +29,9 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
 
 ## Arquitectura
 - **`AppShell.tsx`** (raíz) decide qué se muestra:
-  - `quickMode` → `QuickSplit` (reparto rápido **sin cuenta ni proyecto**, efímero).
+  - `quickMode` → `QuickSplit` (reparto rápido **sin proyecto**, efímero). Dos entradas:
+    desde el login (`'login'`, sin cuenta) y desde `HomeProjects` (`'home'`, con sesión: precarga
+    tu nombre como primera persona). Nada se persiste en ninguno de los dos casos.
   - sin sesión → `LoginScreen`.
   - `?join=…` → `JoinScreen` (unirse por enlace; ofrece reclamar un participante existente
     sin cuenta o entrar como nuevo). La invitación se persiste en `sessionStorage` para
@@ -87,13 +89,31 @@ el overview usa este estado por-usuario en vez de `projects.archived_at`) · `00
 Script Node ESM con `@supabase/supabase-js` contra el proyecto real (login anónimo → RPCs → asserts →
 limpieza). Útil para validar migraciones/RLS sin UI. Se escribe temporal y se borra tras correrlo.
 
+## Mapa de arquitectura (`architecture.html`)
+Mapa isométrico interactivo del repo: barrios por subsistema, edificios dimensionados por medición
+real (ficheros y líneas) y flujos animados que recorren caminos que existen en el código.
+- **Autorado** (a mano, en `architecture/graph.ts`): grupos, módulos, prosa, aristas y flujos.
+- **Medido** (generado, nunca a mano): `architecture/measured.generated.ts` vía `scripts/architecture-sync.mjs`
+  con la cobertura de `architecture/coverage.json`. Si un fichero nuevo no lo reclama nadie, sale como
+  *unmapped* en el mapa.
+- Es una herramienta **solo local**: cuelga de `predev`, así que cada `npm run dev` deja el mapa al día.
+  A propósito NO cuelga de `build` — Amplify ejecuta `npm run build` y nunca `npm run dev`, así que el
+  mapa no se puede colar en CI (sin depender de detectar variables de entorno).
+  A mano: `npm run architecture:html` → mide y regenera `architecture.html`, **un solo fichero autocontenido**
+  (JS, CSS e Inter embebidos) que se abre en local con doble clic. **Tampoco se despliega**: vive en la raíz,
+  fuera de `dist/`, así que Amplify no lo sirve.
+- El único punto de contacto con el diseño de la app es `architecture/components/theme.ts` (tokens `--pmp-*`,
+  definidos por la cáscara que genera `scripts/architecture-html.mjs`, en claro y oscuro).
+
 ## Docs relacionados
 - `PLAN_PROYECTOS.md` — producto y fases (1: fundación · 2: gastos · 3: OCR · 4: liquidación+Capacitor).
 - `DESIGN_HANDOFF.md` — lenguaje visual.
 - `NATIVE_HANDOFF.md` — build y publicación Android/iOS + pendiente de deep-links del login.
-- `SECURITY.md` — medidas de seguridad y pasos pendientes de consola/Lambda.
+- `SECURITY.md` — medidas de seguridad (el Lambda de OCR ya verifica el JWT) y lo que queda en consola.
 
 ## Pendiente / próximos pasos
-- **Acciones de seguridad en consola** (verificar JWT en el Lambda de OCR, activar CAPTCHA + rate-limits, correr `0008`) — ver `SECURITY.md`.
+- **Seguridad: nada pendiente** a 19-08-2026 — JWT verificado en el Lambda de OCR, CAPTCHA de Turnstile
+  activo, `0008` (limpieza de anónimos con `pg_cron`) ejecutada y rate-limits de Supabase endurecidos.
+  Ver `SECURITY.md`, que ahora es registro de cómo está montado.
 - **Deep-links del login nativo** (Google/magic-link en la app) — ver `NATIVE_HANDOFF.md`. El modo invitado ya funciona en nativo.
 - Iconos/splash nativos (`@capacitor/assets`), cámara nativa opcional (`@capacitor/camera`).

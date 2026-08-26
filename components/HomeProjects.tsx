@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Loader2, LogOut, MoreVertical, Trash2, Archive, ChevronDown, ChevronRight, DoorOpen, Pencil } from 'lucide-react';
+import { Plus, Loader2, LogOut, MoreVertical, Trash2, Archive, ChevronDown, ChevronRight, DoorOpen, Pencil, ScanLine } from 'lucide-react';
 import { Project, ProjectOverview, projectEmoji } from '../types';
 import { listProjectsOverview, deleteProject, archiveProject, leaveProject } from '../services/projects';
 import { formatMoney } from '../services/format';
@@ -11,6 +11,8 @@ import { ThemeToggle } from './ThemeToggle';
 interface Props {
   auth: UseAuth;
   onOpenProject: (project: Project, isNew?: boolean) => void;
+  /** Reparto puntual: escanear un ticket y repartirlo sin crear proyecto. */
+  onQuickSplit: () => void;
 }
 
 const initials = (n: string) => n.trim().charAt(0).toUpperCase() || '?';
@@ -20,7 +22,7 @@ const toProject = (o: ProjectOverview): Project => ({
   created_at: o.created_at, created_by: o.created_by, archived_at: o.archived_at,
 });
 
-export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
+export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject, onQuickSplit }) => {
   const [projects, setProjects] = useState<ProjectOverview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +232,19 @@ export const HomeProjects: React.FC<Props> = ({ auth, onOpenProject }) => {
       </header>
 
       <h1 className="px-5 pt-2 pb-4 text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 shrink-0">Mis proyectos</h1>
+
+      {/* Reparto puntual: una cena suelta no merece un proyecto. Efímero, no se guarda. */}
+      <button
+        onClick={onQuickSplit}
+        className="mx-5 mb-4 flex items-center gap-3 rounded-2xl border border-blue-100 dark:border-blue-950 bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-left hover:border-blue-200 dark:hover:border-blue-900 active:scale-[0.99] transition-all shrink-0"
+      >
+        <span className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0"><ScanLine size={22} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold text-zinc-900 dark:text-zinc-50">Reparto rápido</span>
+          <span className="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Escanea un ticket y repártelo al momento, sin crear proyecto.</span>
+        </span>
+        <ChevronRight size={18} className="text-blue-600 dark:text-blue-400 shrink-0" />
+      </button>
 
       {auth.authError && (
         <div className="mx-5 mb-3 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 text-sm font-medium shrink-0">

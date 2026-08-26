@@ -27,11 +27,22 @@ const QuickShell: React.FC<{ title: string; onBack: () => void; footer?: React.R
   </div>
 );
 
-// Reparto rápido: escanear un ticket y repartirlo en un solo móvil, sin cuenta
-// ni proyecto. Todo en memoria; nada se guarda.
-export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+interface Props {
+  onExit: () => void;
+  /** Nombre del usuario (si hay sesión): entra ya como primera persona del reparto. */
+  myName?: string | null;
+  /** true si se abrió desde "Mis proyectos" (usuario con sesión) y no desde el login. */
+  fromHome?: boolean;
+}
+
+// Reparto rápido: escanear un ticket y repartirlo en un solo móvil, sin proyecto.
+// Todo en memoria; nada se guarda. Accesible desde el login (sin cuenta) y desde
+// "Mis proyectos" (con sesión), para la cena puntual que no merece un proyecto.
+export const QuickSplit: React.FC<Props> = ({ onExit, myName, fromHome = false }) => {
   const [step, setStep] = useState<'people' | 'scan' | 'loading' | 'assign' | 'result'>('people');
-  const [people, setPeople] = useState<Person[]>([]);
+  const [people, setPeople] = useState<Person[]>(() =>
+    myName?.trim() ? [{ id: uid(), name: myName.trim(), color: AVATAR_COLORS[0] }] : [],
+  );
   const [name, setName] = useState('');
   const [lines, setLines] = useState<SplitLine[]>([]);
   const [payer, setPayer] = useState('');
@@ -109,7 +120,11 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     return (
       <QuickShell title="Reparto rápido" onBack={onExit}
         footer={<button onClick={() => setStep('scan')} disabled={people.length < 2} className={btn}>Continuar</button>}>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">¿Quién sois? Añade al menos 2 personas. No hace falta cuenta.</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+          {fromHome
+            ? '¿Quién sois? Añade al menos 2 personas. Este reparto es de usar y tirar: no se guarda en ningún proyecto.'
+            : '¿Quién sois? Añade al menos 2 personas. No hace falta cuenta.'}
+        </p>
         <div className="flex items-center gap-2 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-3 bg-white dark:bg-zinc-900 mb-4 focus-within:ring-2 focus-within:ring-blue-500">
           <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPerson()} placeholder="Nombre" className="flex-1 py-3 bg-transparent outline-none font-medium text-zinc-900 dark:text-zinc-50" autoFocus />
           <button onClick={addPerson} disabled={!name.trim()} className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center disabled:opacity-40"><Plus size={18} /></button>
@@ -182,7 +197,9 @@ export const QuickSplit: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       footer={
         <div className="space-y-2">
           <button onClick={share} className={`${btn} flex items-center justify-center gap-2`}><Share2 size={18} /> {copied ? 'Copiado' : 'Compartir'}</button>
-          <button onClick={onExit} className="w-full text-zinc-500 dark:text-zinc-400 font-semibold py-2 text-sm">Guardar y llevar cuentas → crea una cuenta</button>
+          <button onClick={onExit} className="w-full text-zinc-500 dark:text-zinc-400 font-semibold py-2 text-sm">
+            {fromHome ? 'Listo, volver a mis proyectos' : 'Guardar y llevar cuentas → crea una cuenta'}
+          </button>
         </div>
       }>
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 mb-5">

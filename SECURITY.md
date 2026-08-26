@@ -1,7 +1,9 @@
 # SECURITY.md — Endurecimiento
 
-Estado de las medidas de seguridad. Lo marcado **[código]** ya está en el repo; lo marcado
-**[tú]** requiere acción en una consola externa (Supabase / Cloudflare / AWS Lambda).
+Estado de las medidas de seguridad. Lo marcado **[código]** está en el repo; lo marcado **[hecho]** se
+configuró en una consola externa (Supabase / Cloudflare / AWS Lambda) y por eso no se puede comprobar
+leyendo el código. **A 19-08-2026 no queda ningún paso pendiente**: lo que sigue vale como registro de
+cómo está montado y como guía si hay que repetirlo o rotar claves.
 
 ---
 
@@ -9,9 +11,9 @@ Estado de las medidas de seguridad. Lo marcado **[código]** ya está en el repo
 **[código]** `services/ocr.ts` ahora envía `Authorization: Bearer <access_token>` (token de la sesión
 Supabase actual) en la petición al Lambda.
 
-**[tú]** El Lambda (Python, en AWS) debe **verificar** ese token y rechazar (401) si falta o es inválido,
-para que deje de ser un endpoint abierto. Ejemplo con PyJWT (verificación por JWKS, válida para las
-claves asimétricas actuales de Supabase):
+**[hecho]** El Lambda (Python, en AWS) **ya verifica** ese token y rechaza (401) si falta o es inválido:
+dejó de ser un endpoint abierto. Referencia de lo que hay montado allí — PyJWT con verificación por
+JWKS, válida para las claves asimétricas actuales de Supabase:
 
 ```python
 import os, jwt
@@ -57,12 +59,13 @@ def verify_supabase_jwt(auth_header: str) -> dict:
 usado en `LoginScreen` para *invitado* y *magic-link*). Si no hay clave, no se renderiza y la auth va sin
 captcha. `useAuth.continueAsGuest`/`signInEmail` aceptan y envían `captchaToken`.
 
-**[tú]** Activarlo:
+**[hecho]** Activado: hay `VITE_TURNSTILE_SITE_KEY` en `.env.production` y el CAPTCHA está habilitado en
+Supabase con la secret key de Turnstile. Cómo se montó, por si hay que repetirlo o rotar la clave:
 1. **Cloudflare** → Turnstile → crea un widget → obtén **Site Key** y **Secret Key**.
-2. **Frontend**: pon `VITE_TURNSTILE_SITE_KEY=<site key>` en `.env.production` (y en `.env.local` para dev
+2. **Frontend**: `VITE_TURNSTILE_SITE_KEY=<site key>` en `.env.production` (y en `.env.local` para dev
    — puedes usar la *test key* de Cloudflare `1x00000000000000000000AA`, que siempre pasa).
-3. **Supabase** → Authentication → *Bot & Abuse Protection* (CAPTCHA) → habilita, proveedor **Turnstile**,
-   pega la **Secret Key**.
+3. **Supabase** → Authentication → *Bot & Abuse Protection* (CAPTCHA) → habilitado, proveedor **Turnstile**,
+   con la **Secret Key** pegada.
 > ⚠️ Dev y prod comparten el mismo proyecto Supabase: al activar CAPTCHA se exige **también en dev**, por eso
 > conviene tener una site key (aunque sea de prueba) en `.env.local`.
 > Cubre invitado + magic-link. Google (OAuth) no usa captchaToken (redirige al proveedor).
@@ -70,8 +73,9 @@ captcha. `useAuth.continueAsGuest`/`signInEmail` aceptan y envían `captchaToken
 ---
 
 ## 3. Rate limits (Supabase)
-**[tú]** Supabase → Authentication → **Rate Limits**: ajusta los límites por hora (OTP/magic-link, signups,
-anónimos, refresh de token). Hay valores por defecto; endurécelos según el tráfico esperado.
+**[hecho]** Supabase → Authentication → **Rate Limits**: los límites por hora (OTP/magic-link, signups,
+anónimos, refresh de token) están endurecidos por encima de los valores por defecto. Revísalos si el
+tráfico cambia de orden de magnitud.
 
 ---
 
@@ -79,8 +83,8 @@ anónimos, refresh de token). Hay valores por defecto; endurécelos según el tr
 **[código]** Migración `supabase/migrations/0008_cleanup_anon.sql`: función `cleanup_anonymous_users()`
 que borra anónimos de >30 días **sin datos** (0 proyectos, 0 participaciones) + tarea diaria con `pg_cron`.
 
-**[tú]** Ejecuta la `0008` en el SQL Editor (si `create extension pg_cron` falla, actívalo antes en
-Dashboard → Database → Extensions). Prueba manual: `select public.cleanup_anonymous_users();`
+**[hecho]** La `0008` está ejecutada y la tarea diaria (03:00) programada en `pg_cron`. Prueba manual
+cuando haga falta: `select public.cleanup_anonymous_users();`
 
 ---
 

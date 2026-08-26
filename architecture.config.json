@@ -1,0 +1,14 @@
+{
+  "coverage": "architecture/coverage.json",
+  "output": "architecture/measured.generated.ts",
+  "sources": [
+    "AppShell.tsx",
+    "index.tsx",
+    "types.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "services/**/*.ts",
+    "supabase/migrations/**/*.sql"
+  ],
+  "ignore": []
+}

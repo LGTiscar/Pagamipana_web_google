@@ -14,7 +14,8 @@ import { Project } from './types';
 //  - resto     → login / "Mis proyectos" / detalle / reparto rápido.
 export default function AppShell() {
   const auth = useAuth();
-  const [quickMode, setQuickMode] = useState(false);
+  // Reparto rápido: 'login' → sin cuenta desde el onboarding; 'home' → puntual, con sesión.
+  const [quickMode, setQuickMode] = useState<'login' | 'home' | null>(null);
   const [openProject, setOpenProject] = useState<Project | null>(null);
   const [peopleStep, setPeopleStep] = useState(false);
   // Persistimos la invitación en sessionStorage: al crear cuenta con Google/Apple/
@@ -49,11 +50,21 @@ export default function AppShell() {
     );
   }
 
-  // Reparto rápido sin cuenta ni proyecto (efímero), accesible desde el login.
-  if (quickMode) return <QuickSplit onExit={() => setQuickMode(false)} />;
+  // Reparto rápido sin proyecto (efímero): desde el login (sin cuenta) o desde
+  // "Mis proyectos" (con sesión), para la cena suelta que no merece un proyecto.
+  if (quickMode) {
+    const fromHome = quickMode === 'home';
+    return (
+      <QuickSplit
+        onExit={() => setQuickMode(null)}
+        fromHome={fromHome}
+        myName={fromHome ? auth.displayName : null}
+      />
+    );
+  }
 
   // Sin sesión → pantalla de login (Google / email / probar sin cuenta).
-  if (!auth.session) return <LoginScreen auth={auth} onQuickSplit={() => setQuickMode(true)} />;
+  if (!auth.session) return <LoginScreen auth={auth} onQuickSplit={() => setQuickMode('login')} />;
 
   // Enlace de invitación ?join=<id> → pedir nombre y unirse.
   if (pendingJoin) {
@@ -84,6 +95,7 @@ export default function AppShell() {
     <HomeProjects
       auth={auth}
       onOpenProject={(p, isNew = false) => { setOpenProject(p); setPeopleStep(isNew); }}
+      onQuickSplit={() => setQuickMode('home')}
     />
   );
 }

@@ -1,0 +1,34 @@
+{
+  "$note": "Quién es dueño de qué. Cada fichero fuente debe estar reclamado exactamente una vez; lo que no reclama nadie sale como 'unmapped' en el mapa. Las claves con $ son notas.",
+  "$scope": "App (raíz, components, hooks, services) + migraciones de Supabase. Fuera: configs, android/, ios/ y docs.",
+
+  "shell": { "owns": ["AppShell.tsx", "index.tsx"] },
+  "auth": { "owns": ["hooks/useAuth.ts"] },
+  "login": { "owns": ["components/LoginScreen.tsx", "components/Turnstile.tsx", "components/LinkAccountSheet.tsx"] },
+  "join": { "owns": ["components/JoinScreen.tsx", "components/InvitePanel.tsx"] },
+
+  "home": { "owns": ["components/HomeProjects.tsx", "components/CreateProjectSheet.tsx", "components/ProjectPeopleStep.tsx"] },
+  "project": { "owns": ["components/ProjectDetail.tsx", "components/AddExpenseSheet.tsx"] },
+  "quick": { "owns": ["components/QuickSplit.tsx"] },
+  "scanner": { "owns": ["components/ScanExpenseSheet.tsx", "components/ItemAssigner.tsx"] },
+  "kit": { "owns": ["components/Button.tsx", "components/Logo.tsx", "components/AppleLogo.tsx", "components/ThemeToggle.tsx", "hooks/useTheme.ts"] },
+
+  "client": { "owns": ["services/supabaseClient.ts"] },
+  "projectsSvc": { "owns": ["services/projects.ts"] },
+  "expensesSvc": { "owns": ["services/expenses.ts"] },
+  "ocrPipeline": { "owns": ["services/ocr.ts", "services/imageProcessor.ts"] },
+  "split": { "owns": ["services/itemSplit.ts"] },
+  "model": { "owns": ["types.ts", "services/format.ts", "services/currencies.ts"] },
+
+  "gotrue": { "owns": [] },
+  "schema": { "owns": ["supabase/migrations/0001_init.sql"] },
+  "expensesRpc": { "owns": ["supabase/migrations/0002_expenses.sql", "supabase/migrations/0005_expense_items.sql", "supabase/migrations/0009_edit_expense.sql", "supabase/migrations/0010_item_units.sql"] },
+  "membership": { "owns": ["supabase/migrations/0003_join.sql", "supabase/migrations/0011_claim_participant.sql", "supabase/migrations/0012_leave_and_personal_archive.sql", "supabase/migrations/0013_update_my_name.sql"] },
+  "balances": { "owns": ["supabase/migrations/0004_overview.sql", "supabase/migrations/0006_settlements.sql", "supabase/migrations/0007_archive.sql"] },
+  "cron": { "owns": ["supabase/migrations/0008_cleanup_anon.sql"] },
+
+  "lambda": { "owns": [] },
+  "oauth": { "owns": [] },
+  "captcha": { "owns": [] },
+  "delivery": { "owns": [] }
+}
