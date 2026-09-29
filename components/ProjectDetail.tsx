@@ -3,7 +3,7 @@ import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Came
 import { Participant, Project, Expense, Balance, Settlement, projectEmoji } from '../types';
 import { listParticipants, deleteProject, leaveProject } from '../services/projects';
 import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
-import { SplitLine, linesFromItems, totalsByParticipant, lineShareFor, unitsLabel } from '../services/itemSplit';
+import { SplitLine, linesFromItems, lineShareFor, unitsLabel } from '../services/itemSplit';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
 import { ScanExpenseSheet } from './ScanExpenseSheet';
@@ -19,6 +19,18 @@ interface Props {
 }
 
 const initials = (name: string) => name.trim().charAt(0).toUpperCase() || '?';
+
+interface ExpenseDetail {
+  shares: { participant_id: string; amount: number }[];
+  lines: SplitLine[] | null;   // solo gastos de ticket
+}
+
+const SPLIT_LABEL: Record<string, string> = {
+  equal: 'A partes iguales', shares: 'Por partes', percent: 'Por porcentaje', exact: 'Importes exactos', by_item: 'Por producto',
+};
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack }) => {
   const [tab, setTab] = useState<'gastos' | 'balances' | 'miembros'>('gastos');
@@ -47,10 +59,10 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [settleTarget, setSettleTarget] = useState<{ s: Settlement; idx: number } | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
-  // Desglose por-ítem de gastos de ticket (desplegable en la lista)
+  // Resumen desplegable de cada gasto (reparto por persona + líneas del ticket)
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [itemsCache, setItemsCache] = useState<Record<string, SplitLine[]>>({});
-  const [loadingItemsId, setLoadingItemsId] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, ExpenseDetail>>({});
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
 
   const cur = project.currency;
 
@@ -64,7 +76,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       setParticipants(pa);
       setExpenses(ex);
       setBalances(ba);
-      setItemsCache({});      // datos frescos: invalida el desglose cacheado
+      setDetailCache({});     // datos frescos: invalida el desglose cacheado
       setExpandedId(null);
     } catch (e: any) {
       setError(e.message ?? 'No se pudo cargar el proyecto.');
@@ -92,33 +104,37 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
   const maxAbs = useMemo(() => Math.max(1, ...balances.map(b => Math.abs(b.net))), [balances]);
 
-  // Despliega/pliega el desglose por-ítem de un gasto de ticket (carga perezosa).
+  // Despliega/pliega el resumen de un gasto (carga perezosa de shares y, si es ticket, líneas).
   const toggleExpand = async (e: Expense) => {
     if (expandedId === e.id) { setExpandedId(null); return; }
     setExpandedId(e.id);
-    if (!itemsCache[e.id]) {
-      setLoadingItemsId(e.id);
+    if (!detailCache[e.id]) {
+      setLoadingDetailId(e.id);
       try {
-        const items = await listExpenseItems(e.id);
-        setItemsCache(prev => ({ ...prev, [e.id]: linesFromItems(items) }));
+        const [shares, items] = await Promise.all([
+          listExpenseShares(e.id),
+          e.source === 'ocr' ? listExpenseItems(e.id) : Promise.resolve(null),
+        ]);
+        setDetailCache(prev => ({ ...prev, [e.id]: { shares, lines: items ? linesFromItems(items) : null } }));
       } catch (err: any) {
-        setError(err.message ?? 'No se pudo cargar el detalle del ticket.');
+        setError(err.message ?? 'No se pudo cargar el detalle del gasto.');
       } finally {
-        setLoadingItemsId(null);
+        setLoadingDetailId(null);
       }
     }
   };
 
-  // Abre el gasto en modo edición, cargando sus datos (shares o líneas del ticket).
+  // Abre el gasto en modo edición, reutilizando el detalle ya cargado al desplegarlo.
   const openEdit = async (e: Expense) => {
     setOpeningId(e.id);
     setError(null);
     try {
+      const cached = detailCache[e.id];
       if (e.source === 'ocr') {
-        const items = await listExpenseItems(e.id);
-        setEditOcr({ expense: e, lines: linesFromItems(items) });
+        const lines = cached?.lines ?? linesFromItems(await listExpenseItems(e.id));
+        setEditOcr({ expense: e, lines });
       } else {
-        const shares = await listExpenseShares(e.id);
+        const shares = cached?.shares ?? await listExpenseShares(e.id);
         setEditManual({ expense: e, shares });
       }
     } catch (err: any) {
@@ -241,70 +257,108 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
               {expenses.map(e => {
                 const isOcr = e.source === 'ocr';
                 const open = expandedId === e.id;
+                const detail = detailCache[e.id];
                 return (
-                <div key={e.id} className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
-                  <div className="flex items-center gap-3 p-3">
-                    <button
-                      onClick={isOcr ? () => toggleExpand(e) : undefined}
-                      className={`flex items-center gap-3 flex-1 min-w-0 text-left ${isOcr ? '' : 'cursor-default'}`}
-                    >
-                      <span className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
-                        {isOcr ? <Receipt size={17} /> : <Pencil size={16} />}
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">{e.description}</span>
-                        <span className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1.5">
-                          <span className={`text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${isOcr ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
-                            {isOcr ? 'Ticket' : 'Manual'}
-                          </span>
-                          Pagó {nameOf(e.paid_by)}
+                <div key={e.id} className={`bg-white dark:bg-zinc-900 border rounded-2xl overflow-hidden transition-colors ${open ? 'border-blue-200 dark:border-blue-900' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                  <button
+                    onClick={() => toggleExpand(e)}
+                    aria-expanded={open}
+                    className="w-full flex items-center gap-3 p-3 text-left active:bg-zinc-50 dark:active:bg-zinc-800/50"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 shrink-0">
+                      {isOcr ? <Receipt size={17} /> : <Pencil size={16} />}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">{e.description}</span>
+                      <span className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1.5 min-w-0">
+                        <span className={`shrink-0 text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded ${isOcr ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
+                          {isOcr ? 'Ticket' : 'Manual'}
                         </span>
+                        <span className="truncate">Pagó {nameOf(e.paid_by)}</span>
                       </span>
-                    </button>
-                    <div className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</div>
-                    {isOcr && (
-                      <button onClick={() => toggleExpand(e)} className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 shrink-0" aria-label={open ? 'Ocultar detalle' : 'Ver detalle'}>
-                        {loadingItemsId === e.id ? <Loader2 size={15} className="animate-spin" /> : <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />}
-                      </button>
-                    )}
-                    <button onClick={() => openEdit(e)} disabled={openingId === e.id} className="text-zinc-300 dark:text-zinc-600 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 disabled:opacity-50" aria-label="Editar gasto">
-                      {openingId === e.id ? <Loader2 size={16} className="animate-spin" /> : <Pencil size={15} />}
-                    </button>
-                    <button onClick={() => setConfirmExpense(e)} className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 shrink-0" aria-label="Borrar gasto"><Trash2 size={16} /></button>
-                  </div>
+                    </span>
+                    <span className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums shrink-0">{formatMoney(Number(e.amount_total), cur)}</span>
+                    <span className="text-zinc-300 dark:text-zinc-600 shrink-0">
+                      {loadingDetailId === e.id ? <Loader2 size={15} className="animate-spin" /> : <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />}
+                    </span>
+                  </button>
 
-                  {isOcr && open && itemsCache[e.id] && (
-                    <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-950/40 px-3 py-2.5 space-y-2.5">
+                  {open && detail && (
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-950/40 px-3 pt-3 pb-3 animate-fade-in">
+                      {/* Quién pagó */}
+                      <div className="flex items-center gap-2.5 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl px-3 py-2.5">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${colorOf(e.paid_by)}`}>{initials(nameOf(e.paid_by))}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[11px] font-bold text-zinc-400 dark:text-zinc-500">Pagó</span>
+                          <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-50 truncate">{nameOf(e.paid_by)}{e.paid_by === myParticipant?.id && ' (tú)'}</span>
+                        </span>
+                        <span className="text-base font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(Number(e.amount_total), cur)}</span>
+                      </div>
+                      <div className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1.5 px-1">
+                        {formatDate(e.created_at)} · {SPLIT_LABEL[e.split_type] ?? 'Reparto'}
+                      </div>
+
+                      {/* A quién le toca qué */}
+                      <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mt-3 mb-2 px-1">Reparto</div>
                       {(() => {
-                        const lines = itemsCache[e.id];
-                        const totals = totalsByParticipant(lines);
-                        const consumers = participants.filter(p => (totals[p.id] || 0) > 0.005);
-                        if (consumers.length === 0) return <div className="text-[11px] text-zinc-400 dark:text-zinc-500">Sin detalle de productos.</div>;
-                        return consumers.map(p => {
-                          const its = lines
-                            .map(l => ({ l, share: lineShareFor(l, p.id) }))
-                            .filter(x => x.share > 0.005);
-                          return (
-                            <div key={p.id}>
-                              <div className="flex items-center gap-2">
-                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${colorOf(p.id)}`}>{initials(nameOf(p.id))}</span>
-                                <span className="flex-1 text-sm font-bold text-zinc-800 dark:text-zinc-100">{nameOf(p.id)}</span>
-                                <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(totals[p.id], cur)}</span>
-                              </div>
-                              <div className="pl-8 mt-1 space-y-0.5">
-                                {its.map(({ l, share }) => (
-                                  <div key={l.id} className="flex items-center justify-between text-[12px]">
-                                    <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
-                                      <span className="font-semibold">{unitsLabel(l, p.id)}</span>{l.description || 'Producto'}
+                        const consumers = participants
+                          .map(p => ({ p, amount: detail.shares.find(s => s.participant_id === p.id)?.amount ?? 0 }))
+                          .filter(x => x.amount > 0.005);
+                        if (consumers.length === 0) return <div className="text-[11px] text-zinc-400 dark:text-zinc-500 px-1">Sin reparto registrado.</div>;
+                        return (
+                          <div className="space-y-2.5">
+                            {consumers.map(({ p, amount }) => {
+                              const isPayer = p.id === e.paid_by;
+                              const its = (detail.lines ?? [])
+                                .map(l => ({ l, share: lineShareFor(l, p.id) }))
+                                .filter(x => x.share > 0.005);
+                              return (
+                                <div key={p.id}>
+                                  <div className="flex items-center gap-2 px-1">
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${colorOf(p.id)}`}>{initials(p.display_name)}</span>
+                                    <span className="flex-1 min-w-0">
+                                      <span className="block text-sm font-bold text-zinc-800 dark:text-zinc-100 truncate">{p.display_name}{p.id === myParticipant?.id && ' (tú)'}</span>
+                                      <span className={`block text-[11px] ${isPayer ? 'text-zinc-400 dark:text-zinc-500' : 'text-red-500 dark:text-red-400'}`}>
+                                        {isPayer ? 'Su parte (ya pagada)' : `Debe ${formatMoney(amount, cur)} a ${nameOf(e.paid_by)}`}
+                                      </span>
                                     </span>
-                                    <span className="text-zinc-400 dark:text-zinc-500 tabular-nums shrink-0 ml-2">{formatMoney(share, cur)}</span>
+                                    <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(amount, cur)}</span>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        });
+                                  {its.length > 0 && (
+                                    <div className="pl-9 pr-1 mt-1 space-y-0.5">
+                                      {its.map(({ l, share }) => (
+                                        <div key={l.id} className="flex items-center justify-between text-[12px]">
+                                          <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
+                                            <span className="font-semibold">{unitsLabel(l, p.id)}</span>{l.description || 'Producto'}
+                                          </span>
+                                          <span className="text-zinc-400 dark:text-zinc-500 tabular-nums shrink-0 ml-2">{formatMoney(share, cur)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
                       })()}
+
+                      {/* Acciones */}
+                      <div className="flex gap-2 mt-4">
+                        <button
+                          onClick={() => openEdit(e)}
+                          disabled={openingId === e.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950 disabled:opacity-50"
+                        >
+                          {openingId === e.id ? <Loader2 size={15} className="animate-spin" /> : <Pencil size={15} />} Editar
+                        </button>
+                        <button
+                          onClick={() => setConfirmExpense(e)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-bold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60"
+                        >
+                          <Trash2 size={15} /> Borrar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
