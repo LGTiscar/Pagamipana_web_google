@@ -11,7 +11,7 @@
   "project": { "owns": ["components/ProjectDetail.tsx", "components/AddExpenseSheet.tsx"] },
   "quick": { "owns": ["components/QuickSplit.tsx"] },
   "scanner": { "owns": ["components/ScanExpenseSheet.tsx", "components/ItemAssigner.tsx"] },
-  "kit": { "owns": ["components/Button.tsx", "components/Logo.tsx", "components/AppleLogo.tsx", "components/ThemeToggle.tsx", "hooks/useTheme.ts"] },
+  "kit": { "owns": ["components/Button.tsx", "components/Logo.tsx", "components/AppleLogo.tsx", "components/ThemeToggle.tsx", "hooks/useTheme.ts", "hooks/useVisualViewport.ts"] },
 
   "client": { "owns": ["services/supabaseClient.ts"] },
   "projectsSvc": { "owns": ["services/projects.ts"] },

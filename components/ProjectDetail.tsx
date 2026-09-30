@@ -8,6 +8,7 @@ import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
 import { ScanExpenseSheet } from './ScanExpenseSheet';
 import { InvitePanel } from './InvitePanel';
+import { useVisualViewport } from '../hooks/useVisualViewport';
 
 const num = (s: string) => { const v = parseFloat((s ?? '').replace(',', '.')); return isNaN(v) ? 0 : v; };
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -59,6 +60,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [settleTarget, setSettleTarget] = useState<{ s: Settlement; idx: number } | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
+  const settleViewport = useVisualViewport(!!settleTarget);
   // Resumen desplegable de cada gasto (reparto por persona + líneas del ticket)
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, ExpenseDetail>>({});
@@ -405,7 +407,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                     <button
                       onClick={() => openSettle(s, i)}
                       className="ml-1 shrink-0 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full px-3 py-1.5 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-950"
-                    >Pagar</button>
+                    >Saldar</button>
                   </div>
                 ))}
               </div>
@@ -539,11 +541,15 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
       )}
 
       {settleTarget && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => !settling && setSettleTarget(null)}>
-          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Registrar pago</h2>
+        <div
+          className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          style={settleViewport ? { top: settleViewport.top, height: settleViewport.height } : undefined}
+          onClick={() => !settling && setSettleTarget(null)}
+        >
+          <div className="w-full sm:max-w-sm max-h-full overflow-y-auto bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Saldar deuda</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.from)}</b> paga a <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.to)}</b>. Puedes abonar todo o solo una parte.
+              <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.from)}</b> salda su deuda con <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.to)}</b>. Puede saldarla entera o solo una parte.
             </p>
             <div className="text-center py-3">
               <input
@@ -563,7 +569,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             >Saldar todo ({formatMoney(settleTarget.s.amount, cur)})</button>
             <div className="flex gap-3">
               <button onClick={() => setSettleTarget(null)} disabled={settling} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
-              <button onClick={doSettle} disabled={settling || num(settleAmount) <= 0} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{settling ? 'Guardando…' : 'Confirmar'}</button>
+              <button onClick={doSettle} disabled={settling || num(settleAmount) <= 0} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{settling ? 'Guardando…' : 'Saldar'}</button>
             </div>
           </div>
         </div>
