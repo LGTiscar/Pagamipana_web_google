@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Check, Copy, Share2, UserPlus } from 'lucide-react';
+import { Check, Copy, Share2, UserPlus, Trash2 } from 'lucide-react';
 import { Project, Participant, AVATAR_COLORS } from '../types';
-import { addParticipant } from '../services/projects';
+import { addParticipant, removeParticipant } from '../services/projects';
 
 const initials = (n: string) => n.trim().charAt(0).toUpperCase() || '?';
 
@@ -10,15 +10,20 @@ interface Props {
   project: Project;
   participants: Participant[];
   onAdded: (p: Participant) => void;
+  // Solo el creador: permite eliminar participantes (nunca a sí mismo).
+  canRemove?: boolean;
+  onRemoved?: (id: string) => void;
 }
 
 // Panel de invitación reutilizable (mockup 03): QR + enlace + participantes.
-export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded }) => {
+export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded, canRemove, onRemoved }) => {
   const inviteLink = `${window.location.origin}/?join=${project.id}`;
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const copy = () => {
     navigator.clipboard.writeText(inviteLink).then(() => {
@@ -53,6 +58,21 @@ export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded })
     }
   };
 
+  const remove = async (id: string) => {
+    setRemoving(true);
+    setError(null);
+    try {
+      await removeParticipant(project.id, id);
+      onRemoved?.(id);
+      setConfirmRemove(null);
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo eliminar.');
+      setConfirmRemove(null);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   return (
     <>
       {/* Invitar por enlace / QR */}
@@ -78,7 +98,23 @@ export const InvitePanel: React.FC<Props> = ({ project, participants, onAdded })
           <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
             <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${p.color ?? 'bg-zinc-200 text-zinc-700'}`}>{initials(p.display_name)}</span>
             <span className="flex-1 font-semibold text-zinc-900 dark:text-zinc-50 text-sm">{p.display_name}</span>
-            {!p.profile_id && <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">sin cuenta</span>}
+            {confirmRemove === p.id ? (
+              <span className="flex items-center gap-3 text-sm font-bold">
+                <button onClick={() => remove(p.id)} disabled={removing} className="text-red-600 dark:text-red-400 disabled:opacity-50">{removing ? '…' : 'Eliminar'}</button>
+                <button onClick={() => setConfirmRemove(null)} disabled={removing} className="text-zinc-500 dark:text-zinc-400">Cancelar</button>
+              </span>
+            ) : (
+              <>
+                {!p.profile_id && <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">sin cuenta</span>}
+                {canRemove && p.profile_id !== project.created_by && (
+                  <button
+                    onClick={() => { setError(null); setConfirmRemove(p.id); }}
+                    className="text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 p-1 -m-1"
+                    aria-label={`Eliminar a ${p.display_name}`}
+                  ><Trash2 size={15} /></button>
+                )}
+              </>
+            )}
           </div>
         ))}
         <div className="flex items-center gap-2 px-4 py-2.5">

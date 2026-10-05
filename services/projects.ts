@@ -101,6 +101,11 @@ export async function listParticipants(projectId: string): Promise<Participant[]
   return (data ?? []) as Participant[];
 }
 
+// Elimina un participante (RPC: solo el creador y solo si no tiene gastos ni saldo).
+export async function removeParticipant(projectId: string, participantId: string): Promise<void> {
+  await withJwtRetry(() => supabase.rpc('remove_participant', { p_project_id: projectId, p_participant_id: participantId }));
+}
+
 // Añade un participante (por defecto "virtual", sin cuenta asociada).
 export async function addParticipant(
   projectId: string,

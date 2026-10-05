@@ -15,14 +15,14 @@ export const MEASURED: Record<string, { count: number; loc: number }> = {
   'expensesRpc': { count: 4, loc: 577 },
   'expensesSvc': { count: 1, loc: 177 },
   'home': { count: 3, loc: 537 },
-  'join': { count: 2, loc: 237 },
+  'join': { count: 2, loc: 275 },
   'kit': { count: 6, loc: 180 },
   'login': { count: 3, loc: 345 },
   'membership': { count: 4, loc: 317 },
   'model': { count: 3, loc: 226 },
   'ocrPipeline': { count: 2, loc: 127 },
-  'project': { count: 2, loc: 842 },
-  'projectsSvc': { count: 1, loc: 117 },
+  'project': { count: 2, loc: 844 },
+  'projectsSvc': { count: 1, loc: 122 },
   'quick': { count: 1, loc: 273 },
   'scanner': { count: 2, loc: 348 },
   'schema': { count: 1, loc: 189 },
@@ -30,4 +30,6 @@ export const MEASURED: Record<string, { count: number; loc: number }> = {
   'split': { count: 1, loc: 140 },
 }
 
-export const UNCLAIMED: string[] = []
+export const UNCLAIMED: string[] = [
+  'supabase/migrations/0014_remove_participant.sql',
+]

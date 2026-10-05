@@ -29,7 +29,7 @@ export const ProjectPeopleStep: React.FC<{ project: Project; onDone: () => void 
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="animate-spin text-zinc-300 dark:text-zinc-600" size={24} /></div>
           ) : (
-            <InvitePanel project={project} participants={participants} onAdded={p => setParticipants(prev => [...prev, p])} />
+            <InvitePanel project={project} participants={participants} onAdded={p => setParticipants(prev => [...prev, p])} canRemove onRemoved={id => setParticipants(prev => prev.filter(x => x.id !== id))} />
           )}
         </div>
 

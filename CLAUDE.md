@@ -71,7 +71,9 @@ add_ocr_expense · `0006` settlements (+ balances con liquidaciones) · `0007` a
 `0012` borrado solo del creador (`overview.created_by`), salir del proyecto (`leave_project`, solo
 no-creador y sin huella económica) y archivado PERSONAL (`project_archives` + `set_project_archived`;
 el overview usa este estado por-usuario en vez de `projects.archived_at`) · `0013` elegir/editar nombre
-(`update_my_name`: actualiza `profiles.display_name` y mis `participants.display_name` en todos los proyectos).
+(`update_my_name`: actualiza `profiles.display_name` y mis `participants.display_name` en todos los proyectos) ·
+`0014` el creador elimina participantes (`remove_participant`: solo creador, nunca a sí mismo, solo sin
+huella económica) y se quita la policy de DELETE directo sobre `participants` (antes cualquier miembro podía).
 **Al crear una migración nueva, recuérdale al usuario que la ejecute.**
 
 ## Convenciones

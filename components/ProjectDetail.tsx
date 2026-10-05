@@ -420,6 +420,8 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
               project={project}
               participants={participants}
               onAdded={p => { setParticipants(prev => [...prev, p]); getBalances(project.id).then(setBalances).catch(() => {}); }}
+              canRemove={isCreator}
+              onRemoved={id => { setParticipants(prev => prev.filter(x => x.id !== id)); getBalances(project.id).then(setBalances).catch(() => {}); }}
             />
             {isCreator ? (
               <button
