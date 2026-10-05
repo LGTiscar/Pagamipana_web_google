@@ -67,8 +67,10 @@ export const JoinScreen: React.FC<Props> = ({ projectId, auth, onJoined, onCance
 
   return (
     <div className="h-[100dvh] w-full flex justify-center bg-zinc-100 dark:bg-black">
-      <div className="w-full max-w-md h-full flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 shadow-sm px-7">
-        <div className="w-full max-w-[340px] text-center">
+      {/* Desplazable: con muchas personas la lista no cabe (sobre todo en el navegador móvil,
+          donde 100dvh es menor). `my-auto` centra si cabe sin recortar la parte de arriba si no. */}
+      <div className="w-full max-w-md h-full overflow-y-auto flex flex-col items-center bg-zinc-50 dark:bg-zinc-950 shadow-sm px-7">
+        <div className="w-full max-w-[340px] text-center my-auto py-8">
           <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-3xl shadow-lg shadow-blue-600/40 mx-auto">🎉</div>
           <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 mt-4">Te han invitado</h1>
           <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mt-2">
