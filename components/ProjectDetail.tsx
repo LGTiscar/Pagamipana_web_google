@@ -57,7 +57,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const [confirmExpense, setConfirmExpense] = useState<Expense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState(false);
   // Reembolso (importe editable, pagos parciales)
-  const [settleTarget, setSettleTarget] = useState<{ s: Settlement; idx: number } | null>(null);
+  const [settleTarget, setSettleTarget] = useState<{ from: string; to: string } | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
   const settleViewport = useVisualViewport(!!settleTarget);
@@ -161,19 +161,35 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   };
 
   // Abre el modal de reembolso con el importe sugerido por defecto (editable).
-  const openSettle = (s: Settlement, idx: number) => {
-    setSettleTarget({ s, idx });
+  const openSettle = (s: Settlement) => {
+    setSettleTarget({ from: s.from, to: s.to });
     setSettleAmount(s.amount.toFixed(2));
   };
+
+  // Pago libre: entre dos personas cualesquiera y por el importe que sea (un bizum o una
+  // transferencia hechos por fuera). No tiene por qué coincidir con lo que sugiere la app.
+  const openFreeSettle = () => {
+    const from = myParticipant?.id ?? participants[0]?.id;
+    const to = participants.find(p => p.id !== from)?.id;
+    if (!from || !to) return;
+    setSettleTarget({ from, to });
+    setSettleAmount('');
+  };
+
+  // Importe que la app sugiere para el par elegido (null si ese par no está entre los sugeridos).
+  const settleSuggested = settleTarget
+    ? settlements.find(s => s.from === settleTarget.from && s.to === settleTarget.to)?.amount ?? null
+    : null;
 
   const doSettle = async () => {
     if (!settleTarget) return;
     const amount = r2(num(settleAmount));
     if (amount <= 0) { setError('Introduce un importe mayor que 0.'); return; }
+    if (settleTarget.from === settleTarget.to) return;
     setSettling(true);
     setError(null);
     try {
-      await recordSettlement(project.id, settleTarget.s.from, settleTarget.s.to, amount);
+      await recordSettlement(project.id, settleTarget.from, settleTarget.to, amount);
       setBalances(await getBalances(project.id));
       setSettleTarget(null);
     } catch (e: any) {
@@ -405,11 +421,24 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                     <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 flex-1 min-w-0 truncate">{nameOf(s.from)} <span className="text-zinc-300 dark:text-zinc-600">→</span> {nameOf(s.to)}</span>
                     <span className="font-extrabold text-zinc-900 dark:text-zinc-50 tabular-nums">{formatMoney(s.amount, cur)}</span>
                     <button
-                      onClick={() => openSettle(s, i)}
+                      onClick={() => openSettle(s)}
                       className="ml-1 shrink-0 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full px-3 py-1.5 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-950"
                     >Saldar</button>
                   </div>
                 ))}
+              </div>
+            )}
+            {participants.length >= 2 && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={openFreeSettle}
+                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                >
+                  <Plus size={15} /> Registrar otro pago
+                </button>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+                  ¿Un bizum o una transferencia por vuestra cuenta? Apúntalo y se recalculan las cuentas.
+                </p>
               </div>
             )}
           </div>
@@ -549,29 +578,65 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
           onClick={() => !settling && setSettleTarget(null)}
         >
           <div className="w-full sm:max-w-sm max-h-full overflow-y-auto bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Saldar deuda</h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Registrar pago</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.from)}</b> salda su deuda con <b className="text-zinc-900 dark:text-zinc-50">{nameOf(settleTarget.s.to)}</b>. Puede saldarla entera o solo una parte.
+              Apunta un pago entre dos personas, entero o solo una parte. No tiene por qué ser el que sugiere la app.
             </p>
+            <div className="flex gap-3 mt-4">
+              <label className="flex-1 min-w-0">
+                <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">Paga</span>
+                <select
+                  value={settleTarget.from}
+                  onChange={e => {
+                    const from = e.target.value;
+                    // Si choca con quien recibe, se intercambian en vez de dejar un pago a uno mismo.
+                    setSettleTarget(t => t && ({ from, to: from === t.to ? t.from : t.to }));
+                  }}
+                  className="w-full mt-1 px-3 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+                >
+                  {participants.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+                </select>
+              </label>
+              <label className="flex-1 min-w-0">
+                <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">Recibe</span>
+                <select
+                  value={settleTarget.to}
+                  onChange={e => {
+                    const to = e.target.value;
+                    setSettleTarget(t => t && ({ to, from: to === t.from ? t.to : t.from }));
+                  }}
+                  className="w-full mt-1 px-3 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+                >
+                  {participants.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+                </select>
+              </label>
+            </div>
             <div className="text-center py-3">
               <input
                 value={settleAmount}
                 onChange={e => setSettleAmount(e.target.value)}
                 inputMode="decimal"
+                placeholder="0,00"
                 autoFocus
-                className="w-full text-center text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 outline-none bg-transparent"
+                className="w-full text-center text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 outline-none bg-transparent"
               />
               <div className="text-xs text-zinc-400 dark:text-zinc-500 font-semibold mt-1">
-                Importe ({cur}) · sugerido {formatMoney(settleTarget.s.amount, cur)}
+                Importe ({cur}){settleSuggested != null && ` · sugerido ${formatMoney(settleSuggested, cur)}`}
               </div>
             </div>
-            <button
-              onClick={() => setSettleAmount(settleTarget.s.amount.toFixed(2))}
-              className="w-full text-xs font-bold text-blue-600 dark:text-blue-400 mb-4"
-            >Saldar todo ({formatMoney(settleTarget.s.amount, cur)})</button>
+            {settleSuggested != null ? (
+              <button
+                onClick={() => setSettleAmount(settleSuggested.toFixed(2))}
+                className="w-full text-xs font-bold text-blue-600 dark:text-blue-400 mb-4"
+              >Saldar todo ({formatMoney(settleSuggested, cur)})</button>
+            ) : (
+              <p className="text-xs text-center text-zinc-400 dark:text-zinc-500 mb-4">
+                Este pago no está entre los sugeridos; al guardarlo se recalcula quién debe a quién.
+              </p>
+            )}
             <div className="flex gap-3">
               <button onClick={() => setSettleTarget(null)} disabled={settling} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
-              <button onClick={doSettle} disabled={settling || num(settleAmount) <= 0} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{settling ? 'Guardando…' : 'Saldar'}</button>
+              <button onClick={doSettle} disabled={settling || num(settleAmount) <= 0} className="flex-1 rounded-full py-3 font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">{settling ? 'Guardando…' : 'Guardar pago'}</button>
             </div>
           </div>
         </div>

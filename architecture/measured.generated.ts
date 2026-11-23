@@ -21,7 +21,7 @@ export const MEASURED: Record<string, { count: number; loc: number }> = {
   'membership': { count: 4, loc: 317 },
   'model': { count: 3, loc: 226 },
   'ocrPipeline': { count: 2, loc: 127 },
-  'project': { count: 2, loc: 844 },
+  'project': { count: 2, loc: 909 },
   'projectsSvc': { count: 1, loc: 122 },
   'quick': { count: 1, loc: 273 },
   'scanner': { count: 2, loc: 348 },
