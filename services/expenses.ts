@@ -151,26 +151,36 @@ export async function getBalances(projectId: string): Promise<Balance[]> {
   })) as Balance[];
 }
 
-// "Quién paga a quién" con el mínimo de transferencias (greedy).
+// "Quién paga a quién" (greedy en cadena: como mucho deudores + acreedores − 1 transferencias).
+//
+// ESTABILIDAD: el orden de emparejamiento NO puede depender de lo que queda por pagar (`net`),
+// porque cambia con cada pago registrado y reordenaría todas las parejas: Julia salda lo que le
+// tocaba con Luis y de repente aparece debiéndole a Luis otra vez y a otra persona. Por eso
+// ordenamos por el saldo SOLO de gastos (`paid - owed`, que las liquidaciones no tocan), de mayor
+// a menor, y desempatamos por id. Con un orden fijo, registrar un pago sugerido (entero o parcial)
+// deja el resto de sugerencias exactamente igual. Un gasto nuevo sí puede recolocarlas.
 export function computeSettlements(balances: Balance[]): Settlement[] {
-  const creditors = balances
-    .filter(b => b.net > 0.005)
-    .map(b => ({ id: b.participant_id, amt: b.net }))
-    .sort((a, b) => b.amt - a.amt);
-  const debtors = balances
-    .filter(b => b.net < -0.005)
-    .map(b => ({ id: b.participant_id, amt: -b.net }))
-    .sort((a, b) => b.amt - a.amt);
+  // En céntimos enteros: sin arrastre de coma flotante de un pago a otro.
+  const side = (sign: 1 | -1) => balances
+    .map(b => ({
+      id: b.participant_id,
+      cents: Math.round(sign * b.net * 100),
+      weight: Math.round(Math.abs(b.paid - b.owed) * 100),
+    }))
+    .filter(x => x.cents > 0)
+    .sort((a, b) => b.weight - a.weight || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const creditors = side(1);
+  const debtors = side(-1);
 
   const out: Settlement[] = [];
   let i = 0, j = 0;
   while (i < debtors.length && j < creditors.length) {
-    const pay = Math.min(debtors[i].amt, creditors[j].amt);
-    out.push({ from: debtors[i].id, to: creditors[j].id, amount: Math.round(pay * 100) / 100 });
-    debtors[i].amt -= pay;
-    creditors[j].amt -= pay;
-    if (debtors[i].amt < 0.005) i++;
-    if (creditors[j].amt < 0.005) j++;
+    const pay = Math.min(debtors[i].cents, creditors[j].cents);
+    out.push({ from: debtors[i].id, to: creditors[j].id, amount: pay / 100 });
+    debtors[i].cents -= pay;
+    creditors[j].cents -= pay;
+    if (debtors[i].cents === 0) i++;
+    if (creditors[j].cents === 0) j++;
   }
   return out;
 }
