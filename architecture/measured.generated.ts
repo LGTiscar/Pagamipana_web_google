@@ -13,7 +13,7 @@ export const MEASURED: Record<string, { count: number; loc: number }> = {
   'client': { count: 1, loc: 90 },
   'cron': { count: 1, loc: 41 },
   'expensesRpc': { count: 4, loc: 577 },
-  'expensesSvc': { count: 1, loc: 177 },
+  'expensesSvc': { count: 1, loc: 187 },
   'home': { count: 3, loc: 537 },
   'join': { count: 2, loc: 275 },
   'kit': { count: 6, loc: 180 },
