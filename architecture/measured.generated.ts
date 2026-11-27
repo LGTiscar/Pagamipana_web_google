@@ -26,7 +26,7 @@ export const MEASURED: Record<string, { count: number; loc: number }> = {
   'quick': { count: 1, loc: 273 },
   'scanner': { count: 2, loc: 348 },
   'schema': { count: 1, loc: 189 },
-  'shell': { count: 2, loc: 123 },
+  'shell': { count: 4, loc: 251 },
   'split': { count: 1, loc: 140 },
 }
 

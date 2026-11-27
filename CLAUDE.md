@@ -43,7 +43,12 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
   el nombre visible (perfil).
 - **`services/`**: `supabaseClient` (cliente + `withJwtRetry`: reintenta una vez los errores de JWT,
   p.ej. `JWT issued at future` por desfase de reloj), `projects`, `expenses`, `ocr`, `itemSplit` (lógica de reparto por
-  unidades), `format` (moneda), `currencies` (ISO 4217 vía `Intl`), `imageProcessor` (normaliza/HEIC→JPEG).
+  unidades), `format` (moneda), `currencies` (ISO 4217 vía `Intl`), `imageProcessor` (normaliza/HEIC→JPEG),
+  `appUpdate` (detecta despliegues nuevos comparando `__APP_BUILD__` con `/version.json`, que genera
+  `vite.config.ts` en cada build; recarga sola al arrancar o tras >30 min fuera, si no avisa con `UpdateBanner`.
+  Existe porque la webapp de la pantalla de inicio del iPhone no recarga al abrirse y se quedaba con la versión vieja).
+- **`public/`**: lo que se copia tal cual a `dist/` (`manifest.json`, `icon.svg`). Lo que esté en la raíz NO se
+  despliega (por eso el manifest daba 404 en producción).
 - **`components/`** (nuevo diseño): `LoginScreen`, `JoinScreen`, `HomeProjects`, `ProjectDetail`
   (pestañas **Gastos · Balances · Miembros**; los pagos registrados —`settlements`— salen en Balances
   como «Ya saldado» y mezclados por fecha en Gastos, con deshacer), `CreateProjectSheet`, `AddExpenseSheet`, `ScanExpenseSheet`

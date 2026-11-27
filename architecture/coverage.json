@@ -2,7 +2,7 @@
   "$note": "Quién es dueño de qué. Cada fichero fuente debe estar reclamado exactamente una vez; lo que no reclama nadie sale como 'unmapped' en el mapa. Las claves con $ son notas.",
   "$scope": "App (raíz, components, hooks, services) + migraciones de Supabase. Fuera: configs, android/, ios/ y docs.",
 
-  "shell": { "owns": ["AppShell.tsx", "index.tsx"] },
+  "shell": { "owns": ["AppShell.tsx", "index.tsx", "services/appUpdate.ts", "components/UpdateBanner.tsx"] },
   "auth": { "owns": ["hooks/useAuth.ts"] },
   "login": { "owns": ["components/LoginScreen.tsx", "components/Turnstile.tsx", "components/LinkAccountSheet.tsx"] },
   "join": { "owns": ["components/JoinScreen.tsx", "components/InvitePanel.tsx"] },
