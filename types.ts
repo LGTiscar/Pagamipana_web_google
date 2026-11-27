@@ -165,10 +165,21 @@ export interface Balance {
   net: number;              // paid - owed  (>0 le deben, <0 debe)
 }
 
+// Sugerencia de pago calculada en el cliente ("Cómo saldar").
 export interface Settlement {
   from: string;             // participant id que paga
   to: string;               // participant id que cobra
   amount: number;
+}
+
+// Pago YA registrado (fila de `settlements`): lo que se enseña en "Ya saldado" y en Gastos.
+export interface SettlementRecord {
+  id: string;
+  from_participant: string;
+  to_participant: string;
+  amount: number;
+  created_by: string | null; // perfil que lo apuntó (null en pagos antiguos)
+  created_at: string;
 }
 
 export const SPLIT_TYPES: { value: SplitType; label: string }[] = [

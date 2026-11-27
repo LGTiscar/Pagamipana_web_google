@@ -123,10 +123,11 @@ const AUTHORED: Authored[] = [
     id: 'project', code: 'PR', name: 'El proyecto abierto', role: 'donde se mete el dinero', group: 'app',
     whatItDoes:
       'Tres pestañas — Gastos, Balances y Miembros — y la hoja para añadir o editar un gasto con ' +
-      'su reparto.',
+      'su reparto. Los pagos ya hechos salen en Balances ("Ya saldado") y mezclados con los ' +
+      'gastos, y se pueden deshacer.',
     howItsBuilt:
       'Las tres pestañas viven en un componente porque comparten la misma carga (participantes, ' +
-      'gastos y balances); separarlas obligaba a recargar en cada salto. Es el fichero más gordo ' +
+      'gastos, balances y pagos); separarlas obligaba a recargar en cada salto. Es el fichero más gordo ' +
       'del repo y se nota: el mapa lo dibuja alto por eso.',
     files: ['components/ProjectDetail.tsx', 'components/AddExpenseSheet.tsx'],
   },
@@ -187,11 +188,12 @@ const AUTHORED: Authored[] = [
   {
     id: 'expensesSvc', code: 'EG', name: 'API de gastos', role: 'gastos y saldos', group: 'svc',
     whatItDoes:
-      'Gastos, partes, líneas de ticket, balances y liquidaciones. También propone quién paga a ' +
-      'quién con el mínimo de transferencias.',
+      'Gastos, partes, líneas de ticket, balances y liquidaciones (apuntar, listar y deshacer). ' +
+      'También propone quién paga a quién con pocas transferencias.',
     howItsBuilt:
-      'Ese reparto mínimo ([[computeSettlements]]) se calcula en el cliente con un greedy: es ' +
-      'aritmética sobre cuatro saldos, no merece un viaje al servidor.',
+      'Ese reparto ([[computeSettlements]]) se calcula en el cliente con un greedy: es ' +
+      'aritmética sobre cuatro saldos, no merece un viaje al servidor. Empareja en un orden fijo ' +
+      '(saldo solo de gastos) para que saldar una sugerencia no recoloque las demás.',
     files: ['services/expenses.ts'],
   },
   {

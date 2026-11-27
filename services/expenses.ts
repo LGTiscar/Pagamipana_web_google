@@ -1,5 +1,5 @@
 import { supabase, withJwtRetry } from './supabaseClient';
-import { Expense, Balance, Settlement, SplitType, ExpenseSource } from '../types';
+import { Expense, Balance, Settlement, SettlementRecord, SplitType, ExpenseSource } from '../types';
 
 export async function listExpenses(projectId: string): Promise<Expense[]> {
   const data = await withJwtRetry(() => supabase
@@ -125,18 +125,38 @@ export async function deleteExpense(id: string): Promise<void> {
 }
 
 // Registra un pago entre participantes (liquidación). Reduce la deuda.
+// Devuelve el id de la fila para poder deshacerlo justo después (aviso con "Deshacer").
+// `createdBy` = mi perfil, para enseñar "lo apuntó X" en el historial.
 export async function recordSettlement(
   projectId: string,
   fromParticipant: string,
   toParticipant: string,
   amount: number,
-): Promise<void> {
-  await withJwtRetry(() => supabase.from('settlements').insert({
+  createdBy?: string,
+): Promise<string> {
+  const row = await withJwtRetry(() => supabase.from('settlements').insert({
     project_id: projectId,
     from_participant: fromParticipant,
     to_participant: toParticipant,
     amount,
-  }));
+    created_by: createdBy ?? null,
+  }).select('id').single());
+  return (row as { id: string }).id;
+}
+
+// Pagos ya registrados del proyecto, del más reciente al más antiguo.
+export async function listSettlements(projectId: string): Promise<SettlementRecord[]> {
+  const data = await withJwtRetry(() => supabase
+    .from('settlements')
+    .select('id, from_participant, to_participant, amount, created_by, created_at')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false }));
+  return (data ?? []).map((s: any) => ({ ...s, amount: Number(s.amount) })) as SettlementRecord[];
+}
+
+// Deshace un pago: los balances vuelven a contarlo como pendiente.
+export async function deleteSettlement(id: string): Promise<void> {
+  await withJwtRetry(() => supabase.from('settlements').delete().eq('id', id));
 }
 
 export async function getBalances(projectId: string): Promise<Balance[]> {
