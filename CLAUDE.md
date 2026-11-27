@@ -45,7 +45,8 @@ La clave *secret* de Supabase NUNCA va en el frontend ni en el repo.
   p.ej. `JWT issued at future` por desfase de reloj), `projects`, `expenses`, `ocr`, `itemSplit` (lógica de reparto por
   unidades), `format` (moneda), `currencies` (ISO 4217 vía `Intl`), `imageProcessor` (normaliza/HEIC→JPEG).
 - **`components/`** (nuevo diseño): `LoginScreen`, `JoinScreen`, `HomeProjects`, `ProjectDetail`
-  (pestañas **Gastos · Balances · Miembros**), `CreateProjectSheet`, `AddExpenseSheet`, `ScanExpenseSheet`
+  (pestañas **Gastos · Balances · Miembros**; los pagos registrados —`settlements`— salen en Balances
+  como «Ya saldado» y mezclados por fecha en Gastos, con deshacer), `CreateProjectSheet`, `AddExpenseSheet`, `ScanExpenseSheet`
   (OCR), `ItemAssigner` (asignación por línea/unidades + corrección del OCR: editar nombre/cantidad/precio,
   borrar y añadir líneas; reutilizado en OCR de proyecto, edición de ticket y QuickSplit),
   `InvitePanel` (QR+enlace, reutilizado), `QuickSplit`, `LinkAccountSheet`, `Turnstile` (CAPTCHA), `ThemeToggle`, `Button`, `Logo`.

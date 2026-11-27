@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera, ChevronDown, DoorOpen } from 'lucide-react';
-import { Participant, Project, Expense, Balance, Settlement, projectEmoji } from '../types';
+import { ChevronLeft, Loader2, Plus, Trash2, Receipt, Pencil, Scale, Users, Camera, ChevronDown, DoorOpen, ArrowRight, ArrowRightLeft, Check, CircleCheck, Undo2 } from 'lucide-react';
+import { Participant, Project, Expense, Balance, Settlement, SettlementRecord, projectEmoji } from '../types';
 import { listParticipants, deleteProject, leaveProject } from '../services/projects';
-import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
+import { listExpenses, getBalances, deleteExpense, computeSettlements, recordSettlement, listSettlements, deleteSettlement, listExpenseShares, listExpenseItems } from '../services/expenses';
 import { SplitLine, linesFromItems, lineShareFor, unitsLabel } from '../services/itemSplit';
 import { formatMoney } from '../services/format';
 import { AddExpenseSheet } from './AddExpenseSheet';
@@ -33,11 +33,44 @@ const SPLIT_LABEL: Record<string, string> = {
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
+// Momento de un pago: "Hoy, 22:35" · "Ayer, 19:10" · "26 nov, 22:35" (año solo si no es el actual).
+const formatWhen = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const time = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return `Hoy, ${time}`;
+  if (d.toDateString() === yesterday.toDateString()) return `Ayer, ${time}`;
+  const day = d.toLocaleDateString('es-ES', d.getFullYear() === now.getFullYear()
+    ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${day}, ${time}`;
+};
+
+// Pagos visibles en "Ya saldado" antes de "Ver todos".
+const SETTLED_PREVIEW = 5;
+
+// Lo mínimo de un pago para deshacerlo y describirlo en el aviso.
+type PaymentRef = Pick<SettlementRecord, 'id' | 'from_participant' | 'to_participant' | 'amount'>;
+
+// Gastos y pagos ya hechos, mezclados por fecha en la pestaña Gastos.
+type FeedItem =
+  | { kind: 'expense'; at: number; expense: Expense }
+  | { kind: 'payment'; at: number; payment: SettlementRecord };
+
 export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack }) => {
   const [tab, setTab] = useState<'gastos' | 'balances' | 'miembros'>('gastos');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
+  // Pagos ya registrados (settlements): "Ya saldado" en Balances y entradas "Pago" en Gastos.
+  const [payments, setPayments] = useState<SettlementRecord[]>([]);
+  const [showAllPayments, setShowAllPayments] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState<SettlementRecord | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  // Aviso tras apuntar/deshacer un pago (se va solo a los 5 s). `undo` = se puede deshacer desde él.
+  const [toast, setToast] = useState<{ title: string; detail: string; undo?: PaymentRef } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -70,14 +103,16 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
 
   const load = useCallback(async () => {
     try {
-      const [pa, ex, ba] = await Promise.all([
+      const [pa, ex, ba, pay] = await Promise.all([
         listParticipants(project.id),
         listExpenses(project.id),
         getBalances(project.id),
+        listSettlements(project.id),
       ]);
       setParticipants(pa);
       setExpenses(ex);
       setBalances(ba);
+      setPayments(pay);
       setDetailCache({});     // datos frescos: invalida el desglose cacheado
       setExpandedId(null);
     } catch (e: any) {
@@ -88,6 +123,19 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   }, [project.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Tras apuntar o deshacer un pago: saldos + historial (los gastos no cambian).
+  const refreshPayments = useCallback(async () => {
+    const [ba, pay] = await Promise.all([getBalances(project.id), listSettlements(project.id)]);
+    setBalances(ba);
+    setPayments(pay);
+  }, [project.id]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const nameOf = useCallback(
     (pid: string) => participants.find(p => p.id === pid)?.display_name ?? '—',
@@ -105,6 +153,23 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
   const myNet = balances.find(b => b.participant_id === myParticipant?.id)?.net ?? 0;
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
   const maxAbs = useMemo(() => Math.max(1, ...balances.map(b => Math.abs(b.net))), [balances]);
+  const paidTotal = useMemo(() => payments.reduce((s, p) => s + p.amount, 0), [payments]);
+  const feed = useMemo<FeedItem[]>(() => [
+    ...expenses.map(e => ({ kind: 'expense' as const, at: new Date(e.created_at).getTime(), expense: e })),
+    ...payments.map(p => ({ kind: 'payment' as const, at: new Date(p.created_at).getTime(), payment: p })),
+  ].sort((a, b) => b.at - a.at), [expenses, payments]);
+
+  // "Hoy, 22:35 · lo apuntó Julia" (sin autor en pagos antiguos, que no lo guardaban).
+  const paymentMeta = (p: SettlementRecord) => {
+    let by: string | null = null;
+    if (p.created_by && p.created_by === myProfileId) {
+      by = 'lo apuntaste tú';
+    } else if (p.created_by) {
+      const name = participants.find(x => x.profile_id === p.created_by)?.display_name;
+      if (name) by = `lo apuntó ${name}`;
+    }
+    return [formatWhen(p.created_at), by].filter(Boolean).join(' · ');
+  };
 
   // Despliega/pliega el resumen de un gasto (carga perezosa de shares y, si es ticket, líneas).
   const toggleExpand = async (e: Expense) => {
@@ -188,14 +253,40 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
     if (settleTarget.from === settleTarget.to) return;
     setSettling(true);
     setError(null);
+    const { from, to } = settleTarget;
     try {
-      await recordSettlement(project.id, settleTarget.from, settleTarget.to, amount);
-      setBalances(await getBalances(project.id));
+      const id = await recordSettlement(project.id, from, to, amount, myProfileId);
+      await refreshPayments();
       setSettleTarget(null);
+      setToast({
+        title: 'Pago apuntado',
+        detail: `${nameOf(from)} → ${nameOf(to)} · ${formatMoney(amount, cur)}`,
+        undo: { id, from_participant: from, to_participant: to, amount },
+      });
     } catch (e: any) {
       setError(e.message ?? 'No se pudo registrar el pago.');
     } finally {
       setSettling(false);
+    }
+  };
+
+  // Deshace un pago (desde el aviso, sin confirmar; desde las listas, tras confirmar).
+  const undoPayment = async (p: PaymentRef) => {
+    setUndoing(true);
+    setError(null);
+    try {
+      await deleteSettlement(p.id);
+      await refreshPayments();
+      setConfirmUndo(null);
+      setToast({
+        title: 'Pago deshecho',
+        detail: `${nameOf(p.from_participant)} → ${nameOf(p.to_participant)} · ${formatMoney(p.amount, cur)} vuelve a estar pendiente`,
+      });
+    } catch (e: any) {
+      setConfirmUndo(null);
+      setError(e.message ?? 'No se pudo deshacer el pago.');
+    } finally {
+      setUndoing(false);
     }
   };
 
@@ -264,7 +355,7 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
         ) : error ? (
           <div className="text-center text-red-500 dark:text-red-400 text-sm pt-8">{error}</div>
         ) : tab === 'gastos' ? (
-          expenses.length === 0 ? (
+          feed.length === 0 ? (
             <div className="text-center pt-14 px-6">
               <div className="text-4xl mb-3">🧾</div>
               <p className="font-bold text-zinc-900 dark:text-zinc-50">Aún no hay gastos</p>
@@ -272,7 +363,65 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             </div>
           ) : (
             <div className="space-y-2">
-              {expenses.map(e => {
+              {feed.map(item => {
+                if (item.kind === 'payment') {
+                  // Pago ya hecho: desplegable con quién → quién y "Deshacer pago".
+                  const p = item.payment;
+                  const open = expandedId === p.id;
+                  return (
+                    <div key={p.id} className={`bg-white dark:bg-zinc-900 border rounded-2xl overflow-hidden transition-colors ${open ? 'border-blue-200 dark:border-blue-900' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                      <button
+                        onClick={() => setExpandedId(open ? null : p.id)}
+                        aria-expanded={open}
+                        className="w-full flex items-center gap-3 p-3 text-left active:bg-zinc-50 dark:active:bg-zinc-800/50"
+                      >
+                        <span className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                          <ArrowRightLeft size={17} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">{nameOf(p.from_participant)} pagó a {nameOf(p.to_participant)}</span>
+                          <span className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center gap-1.5 min-w-0">
+                            <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400">Pago</span>
+                            <span className="truncate">{formatWhen(p.created_at)}</span>
+                          </span>
+                        </span>
+                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0">{formatMoney(p.amount, cur)}</span>
+                        <span className="text-zinc-300 dark:text-zinc-600 shrink-0">
+                          <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                        </span>
+                      </button>
+
+                      {open && (
+                        <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-950/40 px-3 pt-3 pb-3 animate-fade-in">
+                          <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl px-2 py-3">
+                            <span className="w-24 min-w-0 flex flex-col items-center gap-1">
+                              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${colorOf(p.from_participant)}`}>{initials(nameOf(p.from_participant))}</span>
+                              <span className="max-w-full text-xs font-bold text-zinc-800 dark:text-zinc-100 truncate">{nameOf(p.from_participant)}{p.from_participant === myParticipant?.id && ' (tú)'}</span>
+                            </span>
+                            <span className="flex-1 flex flex-col items-center gap-0.5 text-zinc-300 dark:text-zinc-600">
+                              <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatMoney(p.amount, cur)}</span>
+                              <ArrowRight size={18} />
+                            </span>
+                            <span className="w-24 min-w-0 flex flex-col items-center gap-1">
+                              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${colorOf(p.to_participant)}`}>{initials(nameOf(p.to_participant))}</span>
+                              <span className="max-w-full text-xs font-bold text-zinc-800 dark:text-zinc-100 truncate">{nameOf(p.to_participant)}{p.to_participant === myParticipant?.id && ' (tú)'}</span>
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1.5 px-1">
+                            {paymentMeta(p)}. Ya está descontado de los balances.
+                          </div>
+                          <button
+                            onClick={() => setConfirmUndo(p)}
+                            className="w-full mt-4 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-bold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60"
+                          >
+                            <Undo2 size={15} /> Deshacer pago
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                const e = item.expense;
                 const isOcr = e.source === 'ocr';
                 const open = expandedId === e.id;
                 const detail = detailCache[e.id];
@@ -428,8 +577,54 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
                 ))}
               </div>
             )}
+
+            {/* Ya saldado: pagos registrados, con deshacer */}
+            {payments.length > 0 && (
+              <>
+                <div className="flex items-baseline justify-between mt-6 mb-2">
+                  <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">
+                    Ya saldado · {payments.length} pago{payments.length > 1 ? 's' : ''}
+                  </div>
+                  <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatMoney(paidTotal, cur)}</div>
+                </div>
+                <div className="space-y-2">
+                  {(showAllPayments ? payments : payments.slice(0, SETTLED_PREVIEW)).map(p => (
+                    <div key={p.id} className="flex items-center gap-2.5 bg-white/60 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-3 pr-1 py-1.5">
+                      <span className="relative w-7 h-7 shrink-0">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold opacity-75 ${colorOf(p.from_participant)}`}>{initials(nameOf(p.from_participant))}</span>
+                        <span className="absolute -right-1 -bottom-1 w-4 h-4 rounded-full bg-emerald-500 dark:bg-emerald-400 border-2 border-white dark:border-zinc-900 flex items-center justify-center text-white dark:text-emerald-950">
+                          <Check size={9} strokeWidth={4} />
+                        </span>
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-semibold text-zinc-600 dark:text-zinc-300 truncate">
+                          {nameOf(p.from_participant)} <span className="text-zinc-300 dark:text-zinc-600">→</span> {nameOf(p.to_participant)}
+                        </span>
+                        <span className="block text-[11px] text-zinc-400 dark:text-zinc-500 truncate">{paymentMeta(p)}</span>
+                      </span>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0">{formatMoney(p.amount, cur)}</span>
+                      <button
+                        onClick={() => setConfirmUndo(p)}
+                        aria-label={`Deshacer el pago de ${nameOf(p.from_participant)} a ${nameOf(p.to_participant)}`}
+                        title="Deshacer"
+                        className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200"
+                      >
+                        <Undo2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {payments.length > SETTLED_PREVIEW && (
+                  <button
+                    onClick={() => setShowAllPayments(v => !v)}
+                    className="w-full mt-1 py-2.5 text-xs font-bold text-blue-600 dark:text-blue-400"
+                  >{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
+                )}
+              </>
+            )}
+
             {participants.length >= 2 && (
-              <div className="mt-4 text-center">
+              <div className="mt-6 text-center">
                 <button
                   onClick={openFreeSettle}
                   className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -495,6 +690,27 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             ><Plus size={28} className={`transition-transform ${fabOpen ? 'rotate-45' : ''}`} /></button>
           </div>
         </>
+      )}
+
+      {/* Aviso tras apuntar/deshacer un pago (en Gastos, por encima del botón +) */}
+      {toast && (
+        <div
+          role="status"
+          className={`absolute left-4 right-4 z-40 flex items-center gap-2.5 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 pl-3.5 pr-1.5 py-1.5 shadow-xl animate-fade-in ${tab === 'gastos' ? 'bottom-44' : 'bottom-24'}`}
+        >
+          <CircleCheck size={20} className="shrink-0 text-emerald-400 dark:text-emerald-600" />
+          <span className="flex-1 min-w-0 py-1.5">
+            <span className="block text-sm font-bold">{toast.title}</span>
+            <span className="block text-xs text-zinc-300 dark:text-zinc-600 truncate">{toast.detail}</span>
+          </span>
+          {toast.undo && (
+            <button
+              onClick={() => undoPayment(toast.undo!)}
+              disabled={undoing}
+              className="shrink-0 px-3 py-3 text-sm font-extrabold text-blue-300 dark:text-blue-700 disabled:opacity-50"
+            >Deshacer</button>
+          )}
+        </div>
       )}
 
       {/* Bottom nav */}
@@ -566,6 +782,22 @@ export const ProjectDetail: React.FC<Props> = ({ project, myProfileId, onBack })
             <div className="flex gap-3 mt-5">
               <button onClick={() => setConfirmExpense(null)} disabled={deletingExpense} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
               <button onClick={doDeleteExpense} disabled={deletingExpense} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{deletingExpense ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmUndo && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => !undoing && setConfirmUndo(null)}>
+          <div className="w-full sm:max-w-sm bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">¿Deshacer este pago?</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+              {nameOf(confirmUndo.from_participant)} → {nameOf(confirmUndo.to_participant)} · {formatMoney(confirmUndo.amount, cur)}.
+              Volverá a contar como pendiente y se recalcularán las cuentas.
+            </p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirmUndo(null)} disabled={undoing} className="flex-1 rounded-full py-3 font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 disabled:opacity-50">Cancelar</button>
+              <button onClick={() => undoPayment(confirmUndo)} disabled={undoing} className="flex-1 rounded-full py-3 font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{undoing ? 'Deshaciendo…' : 'Deshacer'}</button>
             </div>
           </div>
         </div>
