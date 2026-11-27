@@ -70,8 +70,9 @@ const AUTHORED: Authored[] = [
     howItsBuilt:
       'La invitación de `?join=` se guarda en [[sessionStorage]] antes de cualquier login, porque ' +
       'el redirect de OAuth se lleva la query por delante y sin eso el enlace se perdía justo al ' +
-      'crear la cuenta.',
-    files: ['AppShell.tsx', 'index.tsx'],
+      'crear la cuenta. Al arrancar también vigila si hay un despliegue nuevo: la webapp de la ' +
+      'pantalla de inicio del iPhone no recarga sola, así que compara su build con /version.json.',
+    files: ['AppShell.tsx', 'index.tsx', 'services/appUpdate.ts', 'components/UpdateBanner.tsx'],
     stack: ['React 18', 'Vite', 'TypeScript'],
   },
   {
